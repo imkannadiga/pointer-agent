@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+# Virtual environment
+.venv/
+venv/
+
+# Hydra run artifacts
+outputs/
+multirun/
+.hydra/
+
+# Generated / downloaded data and eval artifacts
+output/
+data/
+
+# Model / HF caches, if ever pointed locally instead of ~/.cache
+.cache/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store

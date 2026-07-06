@@ -1,0 +1,11 @@
+n_samples: 200
+languages: ["en", "de"]
+surfaces: ["document", "code_editor", "server_inventory"]
+categories: ["word_center", "word_bbox", "line_start", "line_end"]
+themes: ["light", "dark"]
+font_sizes: [14, 16, 18]
+output_dir: "output/synthetic_v0"
+seed: 42
+push_to_hub: false
+hub_repo_id: null
+hub_token: null

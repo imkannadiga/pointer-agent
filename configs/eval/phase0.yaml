@@ -1,0 +1,14 @@
+# @package _global_
+defaults:
+  - /model/planner: qwen2_5_0_5b
+  - /model/grounder: florence2_base
+  - /model/verifier: qwen2_5_0_5b
+  - _self_
+
+source: synthetic # synthetic | real
+limit: 30
+seed: 42
+synthetic_metadata: "output/synthetic_v0/metadata.jsonl"
+synthetic_images_dir: "output/synthetic_v0/images"
+output_dir: "output/eval/phase0_${source}"
+save_viz: true
