@@ -1,0 +1,33 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  body { padding: 30px; }
+  h1 { font-size: 1.4em; margin: 0 0 20px 0; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td {
+    border: 1px solid {{ "#444444" if theme == "dark" else "#cccccc" }};
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 0.9em;
+  }
+  th { background: {{ "#2a2a2a" if theme == "dark" else "#eeeeee" }}; }
+{% endblock %}
+
+{% block content %}
+<h1>{{ macros.render_words(content.title) }}</h1>
+<table>
+<thead>
+<tr>
+{% for h in content.headers %}<th>{{ macros.render_words(h) }}</th>{% endfor %}
+</tr>
+</thead>
+<tbody>
+{% for row in content.rows %}
+<tr>
+{% for cell in row %}<td>{{ macros.render_words(cell) }}</td>{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% endblock %}

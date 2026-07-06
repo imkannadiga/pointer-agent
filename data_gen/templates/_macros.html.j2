@@ -1,0 +1,3 @@
+{% macro render_words(words) -%}
+{% for w in words %}<span class="word" data-target-id="{{ w.id }}" data-text="{{ w.text | e }}">{{ w.text }}</span>{% if not loop.last %} {% endif %}{% endfor %}
+{%- endmacro %}
