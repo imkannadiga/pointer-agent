@@ -1,0 +1,19 @@
+# @package _global_
+defaults:
+  - /hardware: cpu_smoketest
+  - _self_
+
+model_name: "Qwen/Qwen2.5-0.5B-Instruct"
+data:
+  metadata_path: "output/synthetic_v1/metadata.jsonl"
+  max_train_samples: 32
+  val_fraction: 0.1
+lora:
+  r: 8
+  alpha: 16
+  dropout: 0.05
+  target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+learning_rate: 2e-4
+logging_steps: 1
+output_dir: "output/train/slm_sft/run"
+save_adapter_dir: "output/train/slm_sft/adapter"

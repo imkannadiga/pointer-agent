@@ -1,0 +1,8 @@
+# Device count is deliberately unset (accelerate autodetects num_processes
+# from visible GPUs at launch time) so this same file works from 2-GPU to
+# multi-node without editing - override num_machines/machine_rank/main_process_ip
+# per node for a genuine multi-node launch.
+compute_environment: LOCAL_MACHINE
+distributed_type: MULTI_GPU
+mixed_precision: bf16
+num_machines: 1

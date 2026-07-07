@@ -24,3 +24,6 @@ data/
 .vscode/
 .idea/
 .DS_Store
+
+# Internal working log, not a shipped project doc
+progress.md

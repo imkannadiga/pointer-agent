@@ -14,9 +14,17 @@ TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
 _env = Environment(loader=FileSystemLoader(TEMPLATES_DIR))
 
 
-def render_html(surface: str, content: dict, theme: str, font_size: int = 16) -> str:
+def render_html(
+    surface: str,
+    content: dict,
+    theme: str,
+    font_size: int = 16,
+    occlusion_box: dict | None = None,
+) -> str:
     template = _env.get_template(f"{surface}.html.j2")
-    return template.render(content=content, theme=theme, font_size=font_size)
+    return template.render(
+        content=content, theme=theme, font_size=font_size, occlusion_box=occlusion_box
+    )
 
 
 class Renderer:
@@ -44,16 +52,20 @@ class Renderer:
                 return {
                     id: e.getAttribute('data-target-id'),
                     text: e.getAttribute('data-text'),
+                    kind: e.getAttribute('data-kind'),
+                    field: e.getAttribute('data-field'),
                     x0: r.left, y0: r.top, x1: r.right, y1: r.bottom,
                 };
             })""",
         )
-        # Drop off-viewport / zero-area / whitespace-only boxes.
+        # Drop off-viewport / zero-area boxes. Containers (paragraph/
+        # structural/field/message/field-row) can be whitespace-only or
+        # lack literal text, so the text-emptiness check is word/char only.
         clean = []
         for b in boxes:
             if b["x1"] <= b["x0"] or b["y1"] <= b["y0"]:
                 continue
-            if not b["text"] or not b["text"].strip():
+            if b["kind"] in ("word", "char") and (not b["text"] or not b["text"].strip()):
                 continue
             if b["x0"] < 0 or b["y0"] < 0 or b["x1"] > VIEWPORT["width"] or b["y1"] > VIEWPORT["height"]:
                 continue

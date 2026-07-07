@@ -10,7 +10,12 @@ TASK_PROMPT = "<CAPTION_TO_PHRASE_GROUNDING>"
 
 
 class Florence2Grounder(BaseGrounder):
-    def __init__(self, model_name: str = "microsoft/Florence-2-base", device: str = "cpu"):
+    def __init__(
+        self,
+        model_name: str = "microsoft/Florence-2-base",
+        device: str = "cpu",
+        adapter_path: str | None = None,
+    ):
         self.processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
@@ -18,12 +23,17 @@ class Florence2Grounder(BaseGrounder):
             torch_dtype=torch.float32,
             attn_implementation="eager",
         )
+        if adapter_path:
+            from peft import PeftModel
+
+            self.model = PeftModel.from_pretrained(self.model, adapter_path)
         self.model.to(device)
         self.model.eval()
         self.device = device
 
     def ground(self, image: Image.Image, query: dict) -> dict:
-        prompt = TASK_PROMPT + query["target_phrase"]
+        phrase = query.get("referring_expression") or query["target_phrase"]
+        prompt = TASK_PROMPT + phrase
         inputs = self.processor(text=prompt, images=image, return_tensors="pt").to(self.device)
         with torch.no_grad():
             out = self.model.generate(

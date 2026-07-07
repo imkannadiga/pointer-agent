@@ -8,9 +8,18 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 class QwenSLM:
-    def __init__(self, model_name: str = "Qwen/Qwen2.5-0.5B-Instruct", device: str = "cpu"):
+    def __init__(
+        self,
+        model_name: str = "Qwen/Qwen2.5-0.5B-Instruct",
+        device: str = "cpu",
+        adapter_path: str | None = None,
+    ):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float32)
+        if adapter_path:
+            from peft import PeftModel
+
+            self.model = PeftModel.from_pretrained(self.model, adapter_path)
         self.model.to(device)
         self.model.eval()
         self.device = device

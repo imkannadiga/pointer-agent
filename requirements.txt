@@ -19,3 +19,4 @@ transformers==4.49.0
 accelerate>=0.30
 timm>=1.0
 einops>=0.7
+peft>=0.11

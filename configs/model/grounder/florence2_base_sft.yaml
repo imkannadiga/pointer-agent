@@ -1,0 +1,5 @@
+# Phase 1: LoRA-SFT grounder. Same base model, adapter trained by
+# vlm/train_sft.py (see configs/train/vlm_sft.yaml for the output dir).
+name: "microsoft/Florence-2-base"
+device: "cpu"
+adapter_path: "output/train/vlm_sft/adapter"

@@ -14,7 +14,15 @@ class BasePlanner(ABC):
 
     @abstractmethod
     def parse(self, instruction: str) -> dict:
-        """Returns {"target_phrase": str, "answer_type": "point"|"bbox"}."""
+        """Returns {"target_phrase": str, "answer_type": "point"|"bbox",
+        "referring_expression": str | None}.
+
+        referring_expression is populated only for tasks that need more than
+        a literal on-page phrase to disambiguate (e.g. "just before the word
+        X", "between X and Y") - grounders that support it use it verbatim
+        as their phrase-grounding prompt; grounders that don't can ignore it
+        and fall back to target_phrase. None (the default) preserves the
+        original single-phrase contract exactly."""
         raise NotImplementedError
 
 

@@ -67,16 +67,24 @@ def main(cfg: DictConfig):
         os.makedirs(viz_dir, exist_ok=True)
 
     print(f"Loading planner/verifier SLM: {cfg.model.planner.name}")
-    slm = QwenSLM(cfg.model.planner.name, device=cfg.model.planner.device)
+    slm = QwenSLM(
+        cfg.model.planner.name,
+        device=cfg.model.planner.device,
+        adapter_path=cfg.model.planner.get("adapter_path"),
+    )
     planner = QwenPlanner(slm)
-    if cfg.model.verifier.name == cfg.model.planner.name:
+    if cfg.model.verifier.name == cfg.model.planner.name and not cfg.model.planner.get("adapter_path"):
         verifier_slm = slm
     else:
         verifier_slm = QwenSLM(cfg.model.verifier.name, device=cfg.model.verifier.device)
     verifier = QwenVerifier(verifier_slm)
 
     print(f"Loading grounder VLM: {cfg.model.grounder.name}")
-    grounder = Florence2Grounder(cfg.model.grounder.name, device=cfg.model.grounder.device)
+    grounder = Florence2Grounder(
+        cfg.model.grounder.name,
+        device=cfg.model.grounder.device,
+        adapter_path=cfg.model.grounder.get("adapter_path"),
+    )
 
     pipeline = Pipeline(planner, grounder, verifier)
 

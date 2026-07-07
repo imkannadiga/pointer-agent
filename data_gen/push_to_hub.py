@@ -41,17 +41,22 @@ def _features() -> Features:
             "difficulty": Value("string"),
             "image_size": Sequence(Value("int64")),
             "image": Image(),
+            "target_phrase": Value("string"),
+            "referring_expression": Value("string"),
         }
     )
 
 
 def _build_dataset(output_dir: str) -> Dataset:
     rows = _load_rows(output_dir)
-    # bbox_overlap eval rows don't have min_coverage/min_precision on point
-    # tasks' point_in_bbox eval - normalize so the shared Features schema fits.
     for row in rows:
+        # bbox_overlap eval rows don't have min_coverage/min_precision on point
+        # tasks' point_in_bbox eval - normalize so the shared Features schema fits.
         row["eval"].setdefault("min_coverage", None)
         row["eval"].setdefault("min_precision", None)
+        # Only caret/relative categories populate this; normalize for the
+        # shared Features schema.
+        row.setdefault("referring_expression", None)
     return Dataset.from_list(rows, features=_features())
 
 

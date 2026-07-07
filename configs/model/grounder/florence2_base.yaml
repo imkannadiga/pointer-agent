@@ -1,2 +1,3 @@
 name: "microsoft/Florence-2-base"
 device: "cpu"
+adapter_path: null

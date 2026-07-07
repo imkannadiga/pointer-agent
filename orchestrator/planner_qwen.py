@@ -9,7 +9,12 @@ SYSTEM_PROMPT = (
     "You parse GUI-grounding instructions into a structured query. "
     "Given an instruction, identify the exact text/word/phrase being referred to "
     "and whether the answer should be a single point or a bounding box. "
-    'Respond with strict JSON only, no other text: {"target_phrase": "...", "answer_type": "point"|"bbox"}. '
+    "If the instruction refers to a position relative to some text (e.g. just "
+    "before/after a word, or between two words/characters) rather than the text "
+    "itself, also fill in referring_expression with a short phrase describing "
+    "that position (e.g. \"just before the word 'cores'\"); otherwise leave it null. "
+    'Respond with strict JSON only, no other text: '
+    '{"target_phrase": "...", "answer_type": "point"|"bbox", "referring_expression": "..."|null}. '
     'Use "bbox" only if the instruction asks for a box/boundary/extent/region; otherwise use "point".'
 )
 
@@ -23,7 +28,7 @@ def _fallback_parse(instruction: str) -> dict:
     target_phrase = m.group(1) if m else instruction.strip()
     lowered = instruction.lower()
     answer_type = "bbox" if any(k in lowered for k in _BBOX_KEYWORDS) else "point"
-    return {"target_phrase": target_phrase, "answer_type": answer_type}
+    return {"target_phrase": target_phrase, "answer_type": answer_type, "referring_expression": None}
 
 
 class QwenPlanner(BasePlanner):
@@ -40,6 +45,7 @@ class QwenPlanner(BasePlanner):
                     return {
                         "target_phrase": str(parsed["target_phrase"]),
                         "answer_type": parsed["answer_type"],
+                        "referring_expression": parsed.get("referring_expression") or None,
                     }
             except json.JSONDecodeError:
                 pass

@@ -1,0 +1,5 @@
+# Phase 2: LoRA-SFT planner. Same base model, adapter trained by
+# slm/train_sft.py (see configs/train/slm_sft.yaml for the output dir).
+name: "Qwen/Qwen2.5-0.5B-Instruct"
+device: "cpu"
+adapter_path: "output/train/slm_sft/adapter"
