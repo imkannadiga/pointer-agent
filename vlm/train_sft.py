@@ -69,7 +69,13 @@ def main(cfg: DictConfig):
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
     if hw.gradient_checkpointing:
-        model.gradient_checkpointing_enable()
+        # use_reentrant=False: reentrant checkpointing re-executes forward
+        # under a wrapped autograd Function during backward, which under
+        # DDP (multi_gpu profile) fires per-parameter "gradient ready" hooks
+        # more than once for reused parameters - DDP rejects that
+        # ("Expected to mark a variable ready only once"). Non-reentrant
+        # checkpointing is also the modern PyTorch-recommended default.
+        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
         # With only the LoRA adapter trainable (base model frozen), the first
         # checkpointed segment can see zero tensors requiring grad at its
         # input (e.g. the frozen vision tower), which makes the whole loss

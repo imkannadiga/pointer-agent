@@ -60,11 +60,15 @@ def main(cfg: DictConfig):
     model = get_peft_model(model, lora_config)
     model.print_trainable_parameters()
     if hw.gradient_checkpointing:
-        model.gradient_checkpointing_enable()
-        # See vlm/train_sft.py's comment: standard PEFT + gradient-checkpointing
-        # fix - without this, the frozen base model can leave the checkpointed
-        # graph with no tensor requiring grad, and the loss comes back with no
-        # grad_fn ("element 0 of tensors does not require grad...").
+        # use_reentrant=False: avoids DDP's "Expected to mark a variable
+        # ready only once" under multi_gpu (reentrant checkpointing re-runs
+        # forward during backward, double-firing DDP's gradient-ready hooks
+        # for reused parameters) - see vlm/train_sft.py's comment.
+        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+        # Standard PEFT + gradient-checkpointing fix - without this, the
+        # frozen base model can leave the checkpointed graph with no tensor
+        # requiring grad, and the loss comes back with no grad_fn
+        # ("element 0 of tensors does not require grad...").
         model.enable_input_require_grads()
 
     metadata_path = hydra.utils.to_absolute_path(cfg.data.metadata_path)
