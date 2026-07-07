@@ -13,7 +13,7 @@ lora:
   alpha: 16
   dropout: 0.05
   target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
-learning_rate: 2e-4
+learning_rate: 3e-5
 logging_steps: 1
 output_dir: "output/train/slm_sft/run"
 save_adapter_dir: "output/train/slm_sft/adapter"
