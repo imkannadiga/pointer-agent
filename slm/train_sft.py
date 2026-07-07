@@ -61,6 +61,11 @@ def main(cfg: DictConfig):
     model.print_trainable_parameters()
     if hw.gradient_checkpointing:
         model.gradient_checkpointing_enable()
+        # See vlm/train_sft.py's comment: standard PEFT + gradient-checkpointing
+        # fix - without this, the frozen base model can leave the checkpointed
+        # graph with no tensor requiring grad, and the loss comes back with no
+        # grad_fn ("element 0 of tensors does not require grad...").
+        model.enable_input_require_grads()
 
     metadata_path = hydra.utils.to_absolute_path(cfg.data.metadata_path)
     dataset = PlannerSFTDataset(metadata_path, tokenizer, max_samples=cfg.data.max_train_samples)

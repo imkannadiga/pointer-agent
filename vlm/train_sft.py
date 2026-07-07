@@ -70,6 +70,13 @@ def main(cfg: DictConfig):
     model.print_trainable_parameters()
     if hw.gradient_checkpointing:
         model.gradient_checkpointing_enable()
+        # With only the LoRA adapter trainable (base model frozen), the first
+        # checkpointed segment can see zero tensors requiring grad at its
+        # input (e.g. the frozen vision tower), which makes the whole loss
+        # come back with no grad_fn - this call is the standard PEFT fix:
+        # it forces the input embeddings/patch-embeddings to require grad so
+        # gradient checkpointing has a valid entry point into the graph.
+        model.enable_input_require_grads()
 
     metadata_path = hydra.utils.to_absolute_path(cfg.data.metadata_path)
     dataset = GroundingSFTDataset(metadata_path, max_samples=cfg.data.max_train_samples)
