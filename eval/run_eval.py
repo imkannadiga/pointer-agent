@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw
 
 from eval.fetch_pointerbench import fetch_images, fetch_metadata
 from eval.scorer import evaluate
+from orchestrator.char_locator import TesseractCharLocator
 from orchestrator.grounder_florence2 import Florence2Grounder
 from orchestrator.pipeline import Pipeline
 from orchestrator.planner_qwen import QwenPlanner
@@ -58,6 +59,26 @@ def _save_viz(image: Image.Image, row: dict, prediction: dict, viz_dir: str):
     img.save(os.path.join(viz_dir, f"{row['id']}.png"))
 
 
+def _relation_accuracy(records: list[dict]) -> dict:
+    """Sprint 4: how often the planner's parsed `relation` matches the
+    synthetic ground truth's `relation` - tracked separately from coordinate
+    accuracy since a right-answer-by-luck on the wrong relation (or vice
+    versa) is a distinct failure mode this architecture introduces. Only
+    meaningful for source=synthetic - the real pointerbench-text rows
+    predate this schema and have no `relation` field. Each record is
+    {"predicted": str, "gt": str, "category": str}."""
+    if not records:
+        return {}
+    overall = sum(1 for r in records if r["predicted"] == r["gt"]) / len(records)
+    by_category: dict[str, dict] = {}
+    for r in records:
+        bucket = by_category.setdefault(r["category"], {"hits": 0, "n": 0})
+        bucket["n"] += 1
+        bucket["hits"] += int(r["predicted"] == r["gt"])
+    by_category_acc = {k: {"acc": v["hits"] / v["n"], "n": v["n"]} for k, v in by_category.items()}
+    return {"accuracy": overall, "n": len(records), "by_category": by_category_acc}
+
+
 @hydra.main(config_path="../configs", config_name="eval/phase0", version_base=None)
 def main(cfg: DictConfig):
     output_dir = hydra.utils.to_absolute_path(cfg.output_dir)
@@ -86,16 +107,24 @@ def main(cfg: DictConfig):
         adapter_path=cfg.model.grounder.get("adapter_path"),
     )
 
-    pipeline = Pipeline(planner, grounder, verifier)
+    char_locator = TesseractCharLocator()
+    pipeline = Pipeline(planner, grounder, verifier, char_locator=char_locator)
 
     print(f"Loading ground truth (source={cfg.source}, limit={cfg.limit})")
     gt_rows, image_paths = _load_gt_rows(cfg)
 
     predictions = {}
+    relation_records = []
     for i, row in enumerate(gt_rows):
         image = Image.open(image_paths[row["id"]]).convert("RGB")
         prediction = pipeline.run(image, row["instruction"])
         predictions[row["id"]] = {"id": row["id"], **prediction}
+        if "relation" in row and pipeline.last_query:
+            relation_records.append({
+                "predicted": pipeline.last_query.get("relation"),
+                "gt": row["relation"],
+                "category": row["category"],
+            })
         if cfg.save_viz:
             _save_viz(image, row, prediction, viz_dir)
         print(f"[{i + 1}/{len(gt_rows)}] {row['id']} ({row['category']}): {row['instruction']!r}")
@@ -107,6 +136,7 @@ def main(cfg: DictConfig):
     print(f"Predictions -> {predictions_path}")
 
     report = evaluate(gt_rows, predictions)
+    report["relation_accuracy"] = _relation_accuracy(relation_records)
     report_path = os.path.join(output_dir, "report.json")
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2)
@@ -115,6 +145,11 @@ def main(cfg: DictConfig):
     for axis in ("answer_type", "data_type", "category", "surface", "language", "difficulty"):
         print(f"\nBy {axis}:")
         for key, v in report[f"by_{axis}"].items():
+            print(f"  {key:20s} {v['acc'] * 100:6.2f}%  (n={v['n']})")
+    if report["relation_accuracy"]:
+        ra = report["relation_accuracy"]
+        print(f"\nRelation classification accuracy: {ra['accuracy'] * 100:.2f}% (n={ra['n']})")
+        for key, v in ra["by_category"].items():
             print(f"  {key:20s} {v['acc'] * 100:6.2f}%  (n={v['n']})")
     print(f"\nFull report -> {report_path}")
 

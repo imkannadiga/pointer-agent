@@ -10,28 +10,62 @@ from PIL import Image
 
 
 class BasePlanner(ABC):
-    """Raw instruction -> structured query."""
+    """Raw instruction -> structured query.
+
+    Fixed output shape regardless of category (see progress.md section 4b):
+    the VLM is only ever asked to find `anchor_phrase`; `relation` tells the
+    orchestrator how to turn that anchor into the final answer.
+    """
 
     @abstractmethod
     def parse(self, instruction: str) -> dict:
-        """Returns {"target_phrase": str, "answer_type": "point"|"bbox",
-        "referring_expression": str | None}.
+        """Returns {"anchor_phrase": str, "relation": str,
+        "relation_params": dict, "answer_type": "point"|"bbox"}.
 
-        referring_expression is populated only for tasks that need more than
-        a literal on-page phrase to disambiguate (e.g. "just before the word
-        X", "between X and Y") - grounders that support it use it verbatim
-        as their phrase-grounding prompt; grounders that don't can ignore it
-        and fall back to target_phrase. None (the default) preserves the
-        original single-phrase contract exactly."""
+        `relation == "self"` means the grounder's own bbox for anchor_phrase
+        is the final answer. Every other relation is resolved by a
+        BaseCharLocator against a crop around the grounded anchor - see
+        `orchestrator/char_locator.py` for the concrete relation names
+        (line_edge_start/end, before_word/after_word, between_chars,
+        char_at_occurrence, sentence_end, line_bbox, paragraph_bbox,
+        paragraph_edge_start/end, between_anchors) and what `relation_params`
+        each expects."""
         raise NotImplementedError
 
 
 class BaseGrounder(ABC):
-    """Image + structured query -> point/bbox prediction."""
+    """Image + anchor phrase -> point/bbox prediction.
+
+    Does exactly one job: locate `query["anchor_phrase"]` in the full image.
+    Never asked to represent a relation/boundary/offset itself - that's
+    BaseCharLocator's job."""
 
     @abstractmethod
     def ground(self, image: Image.Image, query: dict) -> dict:
         """Returns {"point": [x, y], "bbox": [x0, y0, x1, y1]} (both populated)."""
+        raise NotImplementedError
+
+
+class BaseCharLocator(ABC):
+    """Deterministic (non-model) resolver: an anchor's grounded bbox + a
+    relation -> a precise final point/bbox, via OCR on a crop around the
+    anchor. Zero model calls, zero training - plain geometry/string logic."""
+
+    @abstractmethod
+    def resolve(
+        self,
+        image: Image.Image,
+        anchor_phrase: str,
+        anchor_bbox: list[int],
+        relation: str,
+        relation_params: dict,
+        answer_type: str,
+    ) -> dict:
+        """Returns {"point": [x, y], "bbox": [x0, y0, x1, y1]} in full-image
+        coordinates (not crop-local) - see progress.md section 4b's
+        coordinate-transform correctness requirement. anchor_phrase is passed
+        through (not just anchor_bbox) so implementations can sanity-check
+        OCR output against its length before trusting it."""
         raise NotImplementedError
 
 

@@ -8,7 +8,7 @@ import json
 import torch
 from torch.utils.data import Dataset
 
-from orchestrator.planner_qwen import SYSTEM_PROMPT
+from orchestrator.planner_qwen import DEFAULT_SYSTEM_PROMPT
 
 
 class PlannerSFTDataset(Dataset):
@@ -27,12 +27,13 @@ class PlannerSFTDataset(Dataset):
     def __getitem__(self, idx: int) -> dict:
         row = self.rows[idx]
         target = {
-            "target_phrase": row["target_phrase"],
+            "anchor_phrase": row["anchor_phrase"],
+            "relation": row["relation"],
+            "relation_params": row["relation_params"],
             "answer_type": row["answer_type"],
-            "referring_expression": row.get("referring_expression"),
         }
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": DEFAULT_SYSTEM_PROMPT},
             {"role": "user", "content": f"Instruction: {row['instruction']}"},
         ]
         prompt = self.tokenizer.apply_chat_template(

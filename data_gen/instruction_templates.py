@@ -211,7 +211,13 @@ def _ref_sentence_boundary(lang, **kw):
 
 
 def _ref_structural(lang, **kw):
-    return STRUCTURAL_NOUN[lang]
+    # Quotes the literal title text (colon-style, matching line_bbox/
+    # paragraph_bbox's convention) so the planner - which has no vision -
+    # has something to echo back as anchor_phrase. See progress.md section 4b.
+    text = kw.get("text")
+    if not text:
+        return STRUCTURAL_NOUN[lang]
+    return f'{STRUCTURAL_NOUN[lang]}: "{text}"'
 
 
 def _ref_blank_line(lang, **kw):

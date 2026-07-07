@@ -12,32 +12,6 @@ coordinate or bounding box for the target.
 ## Architecture
 
 ```
-instruction ──► SLM planner ──► structured query ──► VLM grounder ──► point/bbox
-                (Qwen2.5)         {target_phrase,       (Florence-2)        │
-                                   answer_type}                             ▼
-                                                                    SLM verifier
-                                                                    (shared Qwen)
-                                                                     │ retry on fail
-                                                                     ▼
-                                                              final prediction
-```
-
-Every component sits behind a small ABC (`orchestrator/base.py`) so a new
-planner/grounder/verifier plugs in via a Hydra config change, not an
-orchestration-code change. This is the diagram for what's implemented today
-(Phase 0-3 as described below) — see the next section for a planned
-refinement to this flow, not yet built.
-
-### Planned refinement (Sprint 4, not yet implemented): anchor + relation + deterministic resolution
-
-Design review after Sprint 3 concluded that asking the VLM to directly
-ground relational phrases ("just before the word 'cores'") is architecturally
-mismatched — phrase-grounding VLMs find objects/phrases, they aren't trained
-to represent boundaries, offsets, or ordinal character positions precisely.
-The planned fix separates "find the anchor" (the VLM's actual competency)
-from "resolve the precise relation to that anchor" (deterministic code):
-
-```
 instruction ──► SLM planner ──► {anchor_phrase, relation,     ──► VLM grounder ──► anchor bbox
                 (Qwen2.5)         relation_params, answer_type}   (Florence-2)          │
                                                                                         ▼
@@ -58,17 +32,34 @@ instruction ──► SLM planner ──► {anchor_phrase, relation,     ──
                                                           SLM verifier ──► final prediction
 ```
 
-The planner's output shape becomes fixed for every category (no more
-per-category `referring_expression` bolted on); the VLM's job narrows to
-exactly one thing (locate a phrase); a new `BaseCharLocator` ABC
-(`orchestrator/base.py`, concrete `TesseractCharLocator`) handles every
-category that needs sub-word precision — char/caret/punctuation/line-edge/
-paragraph-edge targets, plus a two-anchor "gap between X and Y" case for
-`between_words`/`blank_line`. Full category→relation mapping for all 39
-synthetic categories, the two bugs found while designing this (an invoice
-VLM-SFT phrase bug, a caret-family ground-truth precision gap), and the
-crop→full-image coordinate-transform correctness requirement are recorded in
-`progress.md` section 4b — implementation is tracked under Sprint 4 below.
+Every component sits behind a small ABC (`orchestrator/base.py`) so a new
+planner/grounder/verifier/locator plugs in via a Hydra config change, not an
+orchestration-code change.
+
+### Design note: anchor + relation + deterministic resolution (Sprint 4)
+
+The planner's output shape is fixed for every category:
+`{anchor_phrase, relation, relation_params, answer_type}`. The VLM
+(Florence-2) only ever does one thing — locate `anchor_phrase` in the full
+image via its native `<CAPTION_TO_PHRASE_GROUNDING>` head. `relation ==
+"self"` (word/invoice/structural-text categories) means that grounded bbox
+*is* the answer. Every other relation (caret/char/line-edge/paragraph-edge/
+between-anchors — 11 in total) is resolved by a deterministic
+`BaseCharLocator` (`orchestrator/char_locator.py`, concrete
+`TesseractCharLocator`) from a crop around the grounded anchor: plain OCR +
+geometry, zero model calls, zero training.
+
+This replaced an earlier (Sprint 3) design where the VLM was asked to
+directly ground relational phrases like "just before the word 'cores'" -
+which turned out to be architecturally mismatched, since phrase-grounding
+VLMs find objects/phrases but aren't trained to represent boundaries,
+offsets, or ordinal character positions precisely. Full category→relation
+mapping for all 39 synthetic categories, the bugs found while building this
+(an invoice VLM-SFT phrase bug, a caret-family ground-truth precision gap, a
+missing `data-text` DOM attribute, and the anchor-bbox-vs-final-bbox
+distinction needed for correct VLM SFT training), and the
+crop→full-image coordinate-transform correctness test are recorded in
+`progress.md` sections 4b/4c.
 
 ## Repo layout
 
@@ -101,6 +92,11 @@ pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorc
 pip install -r requirements.txt
 playwright install chromium
 
+# System binary required by orchestrator/char_locator.py (TesseractCharLocator) -
+# pytesseract (in requirements.txt) is just a thin wrapper around this binary.
+sudo apt-get install -y tesseract-ocr   # Debian/Ubuntu
+# brew install tesseract                 # macOS
+
 # Only needed to actually run the SFT training scripts on a real GPU
 # (bitsandbytes doesn't build/run meaningfully on a CPU-only machine):
 pip install -r requirements-train.txt
@@ -113,6 +109,8 @@ Notes on the pinned versions in `requirements.txt`:
 - No GPU is required to run anything in this repo today — all models used so far
   are CPU-sized. `device` is a config field throughout, so pointing at `cuda` on
   a Colab/GPU box is a config override, not a code change.
+- `pytesseract` needs the system `tesseract-ocr` binary installed separately
+  (not pip-installable) — see above.
 
 ## Usage
 
@@ -263,7 +261,49 @@ saves a LoRA adapter to `cfg.save_adapter_dir`; point
 - **Not done this sprint**: `BaseGrounder`/`BasePlanner` swap validated with a
   second concrete model (e.g. Qwen2-VL) — deferred, still open.
 
+**Sprint 4 — architecture refinement** (`orchestrator/`, `data_gen/`) — see
+the Architecture section above for the design
+- Planner's output contract rewritten to `{anchor_phrase, relation,
+  relation_params, answer_type}` (`orchestrator/planner_qwen.py`,
+  `DEFAULT_SYSTEM_PROMPT` is the single source of truth for the JSON shape).
+  `referring_expression` retired.
+- New `BaseCharLocator` ABC + `TesseractCharLocator`
+  (`orchestrator/char_locator.py`) resolving all 11 non-`self` relations
+  from an OCR'd crop around the VLM-grounded anchor.
+  `orchestrator/pipeline.py` branches on `relation` accordingly (`self` /
+  char-locator / two-VLM-call `between_anchors` geometry).
+- Three data-gen bugs found and fixed: invoice categories now ground on the
+  semantic field label, not the literal (ungroundable-by-the-planner) value;
+  `structural_text` instructions now quote the literal title text (its DOM
+  container was also missing a `data-text` attribute entirely); VLM SFT
+  training now targets the anchor's own box (`anchor_bbox`), not the task's
+  final answer box, which differ for every relational category.
+  `line_start`/`line_end`/`paragraph_start`/`paragraph_end` switched to
+  genuine caret-width ground truth; char/caret/punctuation categories
+  narrowed to `en`/`de` to match the real benchmark.
+- `eval/run_eval.py` reports relation-classification accuracy alongside
+  coordinate accuracy (only for `source=synthetic`).
+- Verified: `tests/test_char_locator.py` (2/2 passed against the real
+  `tesseract-ocr` binary — the required crop→full-image coordinate-transform
+  proof); a full pipeline smoke test ran clean, no exceptions, across every
+  relation type; 0% coordinate accuracy (expected — nothing retrained yet)
+  with 75% relation-classification accuracy zero-shot from the prompted
+  planner. See `progress.md` sections 4b/4c for the full design + build log.
+- **Not done this sprint**: retraining `slm/train_sft.py`/`vlm/train_sft.py`
+  against this new contract (the pre-Sprint-4 SFT runs targeted the retired
+  schema) — that's a Colab/GPU job, tracked as a pending item below.
+
 ### Pending
+
+**Retrain the SFT models against the Sprint 4 schema**
+- `slm/train_sft.py` and `vlm/train_sft.py`'s CPU smoke tests (Sprint 3) ran
+  against the pre-Sprint-4 `target_phrase`/`referring_expression` contract,
+  which no longer exists. Both datasets/scripts already read the new
+  `anchor_phrase`/`anchor_bbox`/`relation`/`relation_params` schema, but
+  haven't been re-run (smoke or full-scale) since. Re-run the CPU smoke
+  tests, then the real Colab/GPU training, then re-evaluate
+  (`model/planner=qwen2_5_0_5b_sft`, `model/grounder=florence2_base_sft`) for
+  real Phase 1/2 + relation-classification accuracy numbers.
 
 **W&B experiment tracking** (spec requirement, not yet wired up)
 - `slm/train_sft.py` and `vlm/train_sft.py` currently set `report_to=[]` —
@@ -275,24 +315,9 @@ saves a LoRA adapter to `cfg.save_adapter_dir`; point
   don't require a W&B account) in both train scripts, and equivalent logging
   in the eval harness and the future RL loop.
 
-**Sprint 4 — architecture refinement + joint RLVR loop (Phase 3)**
-- Implement the anchor + relation + deterministic-resolution redesign
-  (see above and `progress.md` section 4b): rewrite the planner's output
-  contract to `{anchor_phrase, relation, relation_params, answer_type}`
-  (`orchestrator/planner_qwen.py`, with a renamed `DEFAULT_SYSTEM_PROMPT` as
-  the single source of truth for the JSON shape that `orchestrator/pipeline.py`
-  also reads from); retire `referring_expression`; add `BaseCharLocator` +
-  `TesseractCharLocator` (`orchestrator/base.py`, new
-  `orchestrator/char_locator.py` — needs `pytesseract` + system
-  `tesseract-ocr` binary, to be added to `requirements.txt`/install
-  instructions at that point) with a required unit test proving crop-local
-  Tesseract coordinates get transformed back to full-image coordinates
-  correctly; fix the invoice VLM-SFT phrase bug and the `structural_text`
-  instruction-quoting gap found during design; switch `line_start`/
-  `line_end`/`paragraph_start`/`paragraph_end` to caret-width ground truth;
-  narrow char/caret/punctuation categories to `en`/`de` to match the real
-  benchmark's actual language scope; add relation-classification accuracy as
-  a new `eval/run_eval.py` breakdown metric.
+**Sprint 5 — joint RLVR loop (Phase 3)** (split out of the original Sprint 4,
+once architecture refinement lands — needs its own algorithm/reward-shaping
+decisions, so gets its own dedicated planning pass)
 - `rl/`: `BaseReward` interface + RLVR reward function reusing the eval
   scorer's own hit logic.
 - Shared-reward, separate-backward-pass update: one rollout reward, independent
@@ -302,7 +327,7 @@ saves a LoRA adapter to `cfg.save_adapter_dir`; point
   passive pass-through.
 - Multi-GPU/multi-node Hydra hardware profile alongside the single-T4 one.
 
-**Sprint 5 — optional RLHF, scale-out, polish**
+**Sprint 6 — optional RLHF, scale-out, polish** (was Sprint 5)
 - Optional Phase 4: human preference pairs on ambiguous cases → small reward
   model → PPO against it.
 - Validate the multi-GPU/multi-node profile actually runs.
@@ -312,11 +337,13 @@ saves a LoRA adapter to `cfg.save_adapter_dir`; point
 - Full phase-by-phase (0→4) results table across both PointerBench and
   secondary eval sets.
 
-**Sprint 6 — verifier-triggered perturbation retry (post-optimization failsafe)**
+**Sprint 7 — verifier-triggered perturbation retry (post-optimization
+failsafe)** (was Sprint 6)
 - On verification failure, re-run grounding against a slightly offset/
   perturbed crop instead of the same input, to escape a bad local grounding
   result. Deliberately sequenced after Sprint 4's architecture refinement and
-  RLVR loop are both working — a failsafe refinement, not a core-pipeline gap.
+  Sprint 5's RLVR loop are both working — a failsafe refinement, not a
+  core-pipeline gap.
 
 Full background, design rationale, and constraints are in the original project
 spec (not checked into this repo as a file — see project conversation history).

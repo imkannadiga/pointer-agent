@@ -43,7 +43,7 @@ class QwenVerifier(BaseVerifier):
     def _semantically_confident(self, instruction: str, query: dict) -> bool:
         user = (
             f'Instruction: {instruction}\n'
-            f'Matched phrase: "{query["target_phrase"]}"\n'
+            f'Matched phrase: "{query["anchor_phrase"]}"\n'
             "Does the matched phrase plausibly identify what the instruction is asking for?"
         )
         response = self.slm.chat(SYSTEM_PROMPT, user, max_new_tokens=20)

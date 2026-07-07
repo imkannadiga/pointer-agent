@@ -15,7 +15,7 @@
 {%- endmacro %}
 
 {% macro render_structural(block, tag="div") -%}
-<{{ tag }} data-target-id="{{ block.id }}" data-kind="{{ block.kind }}">{{ render_words(block.words) }}</{{ tag }}>
+<{{ tag }} data-target-id="{{ block.id }}" data-kind="{{ block.kind }}" data-text="{{ block.words | map(attribute='text') | join(' ') | e }}">{{ render_words(block.words) }}</{{ tag }}>
 {%- endmacro %}
 
 {% macro render_field(field, tag="span") -%}

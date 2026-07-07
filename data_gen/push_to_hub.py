@@ -41,10 +41,24 @@ def _features() -> Features:
             "difficulty": Value("string"),
             "image_size": Sequence(Value("int64")),
             "image": Image(),
-            "target_phrase": Value("string"),
-            "referring_expression": Value("string"),
+            "anchor_phrase": Value("string"),
+            "anchor_bbox": Sequence(Value("int64")),
+            "relation": Value("string"),
+            "relation_params": {
+                "target_char": Value("string"),
+                "occurrence": Value("int64"),
+                "char1": Value("string"),
+                "char2": Value("string"),
+                "index": Value("int64"),
+                "second_anchor_phrase": Value("string"),
+            },
         }
     )
+
+
+_RELATION_PARAM_KEYS = (
+    "target_char", "occurrence", "char1", "char2", "index", "second_anchor_phrase",
+)
 
 
 def _build_dataset(output_dir: str) -> Dataset:
@@ -54,9 +68,10 @@ def _build_dataset(output_dir: str) -> Dataset:
         # tasks' point_in_bbox eval - normalize so the shared Features schema fits.
         row["eval"].setdefault("min_coverage", None)
         row["eval"].setdefault("min_precision", None)
-        # Only caret/relative categories populate this; normalize for the
-        # shared Features schema.
-        row.setdefault("referring_expression", None)
+        # relation_params only ever has a subset of keys per category; normalize
+        # for the shared Features schema.
+        params = row.get("relation_params") or {}
+        row["relation_params"] = {key: params.get(key) for key in _RELATION_PARAM_KEYS}
     return Dataset.from_list(rows, features=_features())
 
 

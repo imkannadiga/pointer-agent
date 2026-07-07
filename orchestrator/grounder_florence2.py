@@ -32,7 +32,11 @@ class Florence2Grounder(BaseGrounder):
         self.device = device
 
     def ground(self, image: Image.Image, query: dict) -> dict:
-        phrase = query.get("referring_expression") or query["target_phrase"]
+        return self.ground_phrase(image, query["anchor_phrase"])
+
+    def ground_phrase(self, image: Image.Image, phrase: str) -> dict:
+        """Grounds a raw phrase directly - used for the "self" relation and
+        for between_anchors' second anchor, which isn't a full query dict."""
         prompt = TASK_PROMPT + phrase
         inputs = self.processor(text=prompt, images=image, return_tensors="pt").to(self.device)
         with torch.no_grad():

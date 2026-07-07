@@ -5,9 +5,11 @@ Targets stay in Florence-2's own location-token vocabulary (`<loc_N>`,
 N in [0, 999) per axis, quantized the same way its own post-processing code
 dequantizes: `bin = floor(coord / dim * 1000)`) rather than raw decimal
 pixels - see vlm/train_sft.py's module docstring / progress.md for why this
-generalizes better than a from-scratch JSON-coordinate output head. The
-*phrase* fed in as the prompt is the row's `referring_expression` when
-present (caret/between-word categories), else its `target_phrase`.
+generalizes better than a from-scratch JSON-coordinate output head. The VLM
+only ever grounds `anchor_phrase` (Sprint 4 architecture refinement - see
+progress.md section 4b): it's never asked to represent a relation/boundary
+itself, so every row's target is anchor_phrase -> its own bbox, regardless
+of category.
 """
 import json
 import os
@@ -48,9 +50,13 @@ class GroundingSFTDataset(Dataset):
     def __getitem__(self, idx: int) -> dict:
         row = self.rows[idx]
         image = Image.open(os.path.join(self.images_dir, row["file_name"])).convert("RGB")
-        phrase = row.get("referring_expression") or row["target_phrase"]
+        phrase = row["anchor_phrase"]
         prompt = TASK_PROMPT + phrase
-        target_text = phrase + bbox_to_location_tokens(row["bbox"], tuple(row["image_size"]))
+        # Trains on anchor_bbox (the anchor's own box), not row["bbox"] (the
+        # task's final answer) - for relational categories these differ (e.g.
+        # caret_before_word's bbox is a caret sliver outside the word; the
+        # VLM must only ever learn to find the word itself, never the caret).
+        target_text = phrase + bbox_to_location_tokens(row["anchor_bbox"], tuple(row["image_size"]))
         return {"image": image, "prompt": prompt, "target_text": target_text}
 
 

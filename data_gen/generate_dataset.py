@@ -27,7 +27,7 @@ from omegaconf import DictConfig
 from data_gen.content_fillers import generate_content
 from data_gen.instruction_templates import phrase
 from data_gen.render import Renderer, render_html
-from data_gen.task_builder import build_task, CATEGORY_SURFACES
+from data_gen.task_builder import build_task, CATEGORY_SURFACES, languages_for_category
 from data_gen.push_to_hub import push_to_hub, save_local_hf_dataset
 
 IMAGE_SIZE = [1024, 768]
@@ -52,7 +52,7 @@ def generate_row(index: int, category: str, cfg: DictConfig, renderer: Renderer,
     surface = _pick_surface(category, list(cfg.surfaces), rng)
     if surface is None:
         return None
-    language = rng.choice(list(cfg.languages))
+    language = rng.choice(languages_for_category(category, list(cfg.languages)))
     theme = rng.choice(list(cfg.themes))
     font_size = rng.choice(list(cfg.font_sizes))
     occlusion_box = _maybe_occlusion_box(rng, cfg.enable_occlusion)
@@ -84,10 +84,11 @@ def generate_row(index: int, category: str, cfg: DictConfig, renderer: Renderer,
         "language": language,
         "difficulty": task["difficulty"],
         "image_size": IMAGE_SIZE,
-        "target_phrase": task["target_phrase"],
+        "anchor_phrase": task["anchor_phrase"],
+        "anchor_bbox": task["anchor_bbox"],
+        "relation": task["relation"],
+        "relation_params": task["relation_params"],
     }
-    if task.get("referring_expression"):
-        row["referring_expression"] = task["referring_expression"]
     return row
 
 
