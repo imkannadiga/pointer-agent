@@ -7,7 +7,6 @@ gradient_accumulation_steps: 8
 num_train_epochs: 3
 max_steps: -1
 fp16: true
-bf16: false
 gradient_checkpointing: true
 quantization: "4bit"
 dataloader_num_workers: 4

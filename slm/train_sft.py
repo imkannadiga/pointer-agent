@@ -87,7 +87,6 @@ def main(cfg: DictConfig):
         learning_rate=cfg.learning_rate,
         logging_steps=cfg.logging_steps,
         fp16=hw.fp16,
-        bf16=hw.bf16,
         dataloader_num_workers=hw.dataloader_num_workers,
         save_strategy="no",
         report_to=[],
