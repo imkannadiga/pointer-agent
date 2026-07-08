@@ -1,15 +1,11 @@
 # Secondary target: multi-GPU/multi-node, launched via
 # `accelerate launch --config_file configs/accelerate/multi_gpu.yaml <script>`.
-# Newer GPUs support bf16 without a quantized base, so this profile trains
-# in full LoRA + bf16 rather than QLoRA, with larger batches than the T4
-# profile since memory is less constrained.
 device: "cuda"
 per_device_train_batch_size: 8
 gradient_accumulation_steps: 2
 num_train_epochs: 3
 max_steps: -1
-fp16: false
-bf16: true
+fp16: true
 gradient_checkpointing: true
 quantization: "none"
 dataloader_num_workers: 8
