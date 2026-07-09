@@ -291,19 +291,53 @@ the Architecture section above for the design
   planner. See `progress.md` sections 4b/4c for the full design + build log.
 - **Not done this sprint**: retraining `slm/train_sft.py`/`vlm/train_sft.py`
   against this new contract (the pre-Sprint-4 SFT runs targeted the retired
-  schema) — that's a Colab/GPU job, tracked as a pending item below.
+  schema) — that's a Colab/GPU job, done as a follow-up (see below).
+
+**Phase 1 + Phase 2 real SFT result** (`slm/train_sft.py`, `vlm/train_sft.py`, GPU)
+- Real (not smoke-test) LoRA-SFT completed for both the planner and grounder
+  against the Sprint 4 schema, on the user's GPU box. Three real multi-GPU
+  training bugs were found and fixed along the way: a PEFT +
+  gradient-checkpointing input-grad issue, a DDP + reentrant-checkpointing
+  conflict, and `bf16` requested on hardware that didn't support it (fixed
+  by standardizing every hardware profile on fp16 — `bf16` is now removed
+  from the codebase entirely). See `progress.md` section 5 for the full
+  diagnosis trail of each.
+- **Result: 12.00% accuracy on the real 200-row `pointerbench-text`
+  benchmark** (`source=real`, never touched during training), up from Phase
+  0's 0.00% baseline. `missing_predictions: 0`.
+- Investigated the `between_words`/`caret_between_chars` categories'
+  suspicious exact-0% result by cross-referencing predictions against real
+  ground truth row-by-row. **Verdict: not a resolver bug** — two near-miss
+  predictions prove the char-locator/gap-geometry pipeline works correctly
+  when the VLM grounds the anchor; the real failure is a genuine
+  synthetic-vs-real instruction-complexity gap (occurrence disambiguation,
+  style-attribute references like "in bold", long embedded context, generic
+  function-word anchors) that the synthetic generator never produced. Full
+  evidence in `progress.md` section 4d.
+- **Second result, on freshly-generated held-out synthetic data** (disjoint
+  seed from training): **21.00% accuracy (42/200)**, and **99.5%
+  relation-classification accuracy** — strong direct confirmation that the
+  planner's relation classification is essentially solved on in-distribution
+  instructions; the real benchmark's weakness above is genuinely about
+  out-of-distribution phrasing, not the planner breaking. The
+  99.5%-relation-vs-21%-final-accuracy gap points the remaining bottleneck
+  downstream (VLM grounding precision, `char_locator` OCR reliability, bbox
+  strictness). Also surfaced that `invoice` categories (21 of the 39 total,
+  so ~50% of any uniformly-sampled eval set) are the weakest data_type
+  (14.85%, vs. 50-67% for direct-text/structural categories) — plausibly a
+  genuinely harder task (no literal-text match available, semantic-only
+  grounding) rather than a bug, and a candidate for more training investment.
 
 ### Pending
 
-**Retrain the SFT models against the Sprint 4 schema**
-- `slm/train_sft.py` and `vlm/train_sft.py`'s CPU smoke tests (Sprint 3) ran
-  against the pre-Sprint-4 `target_phrase`/`referring_expression` contract,
-  which no longer exists. Both datasets/scripts already read the new
-  `anchor_phrase`/`anchor_bbox`/`relation`/`relation_params` schema, but
-  haven't been re-run (smoke or full-scale) since. Re-run the CPU smoke
-  tests, then the real Colab/GPU training, then re-evaluate
-  (`model/planner=qwen2_5_0_5b_sft`, `model/grounder=florence2_base_sft`) for
-  real Phase 1/2 + relation-classification accuracy numbers.
+**Data-gen hardening for instruction-phrasing complexity** (new, evidenced by the real-eval result above)
+- Occurrence-disambiguation phrasing ("the third X", "the first occurrence
+  of Y") for categories like `between_words`/`caret_between_chars`.
+- The **attribute-based (styling)** task family from the original spec
+  (section 1.6) — planned at kickoff, never implemented in `data_gen/` in
+  any sprint; confirmed via real-eval evidence to be a load-bearing gap.
+- Longer embedded-context instructions, and occasional generic/function-word
+  anchors rather than always-distinctive content words.
 
 **W&B experiment tracking** (spec requirement, not yet wired up)
 - `slm/train_sft.py` and `vlm/train_sft.py` currently set `report_to=[]` —

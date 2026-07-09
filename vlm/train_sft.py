@@ -106,6 +106,10 @@ def main(cfg: DictConfig):
         remove_unused_columns=False,
         use_cpu=(hw.device == "cpu"),
         label_names=["labels"],
+        # Every LoRA parameter participates in every forward pass, so DDP's
+        # unused-parameter scan is pure overhead. Trainer would default this
+        # to True because a PeftModel isn't recognized as a PreTrainedModel.
+        ddp_find_unused_parameters=False,
     )
 
     trainer = Trainer(

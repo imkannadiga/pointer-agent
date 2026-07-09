@@ -46,6 +46,12 @@ class Florence2Grounder(BaseGrounder):
                 max_new_tokens=256,
                 num_beams=1,
                 do_sample=False,
+                # Florence-2's checkpoint ships early_stopping=True (a
+                # beam-search-era default from its decoder config) alongside
+                # num_beams=3; without this override that stale default
+                # leaks through against our num_beams=1 greedy decoding and
+                # transformers warns about the mismatch on every call.
+                early_stopping=False,
             )
         text_out = self.processor.batch_decode(out, skip_special_tokens=False)[0]
         parsed = self.processor.post_process_generation(

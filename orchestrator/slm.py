@@ -4,7 +4,7 @@ Loaded once and passed to both, so the same weights back the "SLM as parser"
 and "SLM as verifier" roles rather than loading two copies.
 """
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 
 class QwenSLM:
@@ -15,7 +15,18 @@ class QwenSLM:
         adapter_path: str | None = None,
     ):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float32)
+        # Qwen2.5's config.json already sets use_sliding_window=false (sliding
+        # window attention is genuinely off), but this transformers version's
+        # sdpa path warns off the raw `sliding_window` window-size value
+        # regardless of that flag, and does so at layer-construction time
+        # inside from_pretrained - so the config must be patched before the
+        # model is built, not after. Clearing it here doesn't change behavior
+        # since sliding window was never active.
+        config = AutoConfig.from_pretrained(model_name)
+        config.sliding_window = None
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name, config=config, torch_dtype=torch.float32
+        )
         if adapter_path:
             from peft import PeftModel
 
