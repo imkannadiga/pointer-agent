@@ -36,7 +36,7 @@ from vlm.dataset import GroundingSFTDataset, make_collate_fn
 
 MODEL_NAME = "microsoft/Florence-2-base"
 # Mirrors configs/train/vlm_sft.yaml's lora block.
-LORA = dict(r=816, alpha=32, dropout=0.05,
+LORA = dict(r=16, alpha=32, dropout=0.05,
             target_modules=["dkv","q_proj", "v_proj"])
 
 
