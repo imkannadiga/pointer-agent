@@ -1,0 +1,57 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"page": "#f0f2f5", "bg": "#ffffff", "fg": "#26262b", "muted": "#8c8c94", "head": "#4f46e5", "head_fg": "#ffffff", "agent_bg": "#f1f0fe", "agent_border": "#d6d3f8", "user_bg": "#4f46e5", "user_fg": "#ffffff", "border": "#e3e3e8"},
+    "dark": {"page": "#0e0e12", "bg": "#1c1c22", "fg": "#e6e6ec", "muted": "#8c8c94", "head": "#4338ca", "head_fg": "#e0e7ff", "agent_bg": "#26263a", "agent_border": "#3b3b58", "user_bg": "#6366f1", "user_fg": "#ffffff", "border": "#33333c"},
+    "sepia": {"page": "#e6dabc", "bg": "#f9f2e1", "fg": "#3a2f19", "muted": "#93825c", "head": "#6d5410", "head_fg": "#f9f2e1", "agent_bg": "#efe4c6", "agent_border": "#d9c99e", "user_bg": "#6d5410", "user_fg": "#f9f2e1", "border": "#ddd0ab"},
+    "high_contrast": {"page": "#000000", "bg": "#0a0a0a", "fg": "#ffffff", "muted": "#cccccc", "head": "#ffff00", "head_fg": "#000000", "agent_bg": "#1a1a00", "agent_border": "#ffff00", "user_bg": "#ffff00", "user_fg": "#000000", "border": "#ffffff"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "Liberation Sans", Arial, sans-serif;
+    background: {{ p.page }};
+    color: {{ p.fg }};
+  }
+  .widget {
+    width: 640px; height: 730px; margin: 19px auto; box-sizing: border-box;
+    background: {{ p.bg }}; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.22);
+    display: flex; flex-direction: column;
+  }
+  .w-head { background: {{ p.head }}; color: {{ p.head_fg }}; padding: 14px 20px; display: flex; align-items: center; gap: 12px; }
+  .w-head .a-dot { width: 34px; height: 34px; border-radius: 50%; background: {{ p.head_fg }}; opacity: 0.9; }
+  .w-head .t { font-weight: bold; }
+  .w-head .sub { font-size: 0.72em; opacity: 0.85; }
+  .w-body { flex: 1; padding: 14px 18px; overflow: hidden; }
+  .day-sep { text-align: center; color: {{ p.muted }}; font-size: 0.68em; margin-bottom: 12px; }
+  .message { margin-bottom: 11px; display: flex; flex-direction: column; align-items: flex-start; }
+  .message .sender { font-size: 0.68em; color: {{ p.muted }}; margin-bottom: 2px; }
+  .bubble { display: inline-block; max-width: 440px; padding: 9px 13px; border-radius: 10px; font-size: 0.88em; line-height: 1.45; background: {{ p.agent_bg }}; border: 1px solid {{ p.agent_border }}; }
+  .message:nth-child(odd) { align-items: flex-end; }
+  .message:nth-child(odd) .bubble { background: {{ p.user_bg }}; color: {{ p.user_fg }}; border: none; }
+  .w-foot { border-top: 1px solid {{ p.border }}; padding: 10px 18px; display: flex; align-items: center; gap: 10px; color: {{ p.muted }}; font-size: 0.8em; }
+  .w-foot .box { flex: 1; border: 1px solid {{ p.border }}; border-radius: 8px; padding: 8px 12px; }
+  .powered { text-align: center; font-size: 0.64em; color: {{ p.muted }}; padding-bottom: 8px; }
+{% endblock %}
+
+{% block content %}
+<div class="widget">
+  <div class="w-head">
+    <span class="a-dot"></span>
+    <span><div class="t">Support</div><div class="sub">Typically replies in a few minutes</div></span>
+  </div>
+  <div class="w-body">
+    <div class="day-sep">&mdash; Today &mdash;</div>
+{% for m in content.messages %}
+    <div class="message" data-target-id="{{ m.id }}" data-kind="message">
+      <div class="sender">{{ macros.render_words(m.sender) }}</div>
+      <div class="bubble">{{ macros.render_words(m.text) }}</div>
+    </div>
+{% endfor %}
+  </div>
+  <div class="w-foot"><span class="box">Write a reply&hellip;</span><span>&#128206;</span></div>
+  <div class="powered">Powered by HelpDesk</div>
+</div>
+{% endblock %}

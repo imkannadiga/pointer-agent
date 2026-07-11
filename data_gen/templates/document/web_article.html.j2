@@ -1,0 +1,45 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"bg": "#ffffff", "fg": "#242424", "muted": "#757575", "accent": "#c2410c", "nav_bg": "#fafafa", "border": "#e6e6e6"},
+    "dark": {"bg": "#191919", "fg": "#e8e6e3", "muted": "#a8a29e", "accent": "#fb923c", "nav_bg": "#111111", "border": "#333333"},
+    "sepia": {"bg": "#f8f1e3", "fg": "#3a3021", "muted": "#8c7f66", "accent": "#9a3412", "nav_bg": "#f1e7d0", "border": "#ddd0b4"},
+    "high_contrast": {"bg": "#000000", "fg": "#ffffff", "muted": "#ffff00", "accent": "#ffff00", "nav_bg": "#000000", "border": "#ffffff"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "DejaVu Sans", Verdana, sans-serif;
+    background: {{ p.bg }};
+    color: {{ p.fg }};
+  }
+  .nav {
+    display: flex; align-items: center; gap: 26px;
+    padding: 12px 48px; background: {{ p.nav_bg }};
+    border-bottom: 1px solid {{ p.border }};
+    font-size: 0.8em;
+  }
+  .nav .site { font-weight: bold; font-size: 1.15em; margin-right: auto; }
+  .nav .link { color: {{ p.muted }}; }
+  .article { max-width: 660px; margin: 26px auto 0 auto; padding: 0 20px; }
+  h1 { font-size: 1.8em; line-height: 1.25; margin: 0 0 10px 0; font-weight: bold; }
+  .accent-bar { width: 64px; height: 5px; background: {{ p.accent }}; margin-bottom: 12px; }
+  .byline { color: {{ p.muted }}; font-size: 0.78em; margin-bottom: 24px; }
+  .article p { margin: 0 0 18px 0; line-height: 1.75; }
+{% endblock %}
+
+{% block content %}
+<div class="nav">
+  <span class="site">The Ledger</span>
+  <span class="link">Latest</span><span class="link">Topics</span><span class="link">Archive</span><span class="link">Subscribe</span>
+</div>
+<div class="article">
+  <h1>{{ macros.render_structural(content.title, tag="span") }}</h1>
+  <div class="accent-bar"></div>
+  <div class="byline">By R. Calloway &middot; 6 min read &middot; Opinion</div>
+{% for para in content.paragraphs %}
+{{ macros.render_paragraph(para) }}
+{% endfor %}
+</div>
+{% endblock %}

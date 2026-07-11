@@ -1,0 +1,43 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"bg": "#fafafa", "fg": "#2d2d2d", "muted": "#9a9a9a", "bar": "#e4e4e4", "bar_fg": "#555555", "prompt": "#0a7d33"},
+    "dark": {"bg": "#0c0c0c", "fg": "#33d17a", "muted": "#1f7a46", "bar": "#2b2b2b", "bar_fg": "#bbbbbb", "prompt": "#8ff0a4"},
+    "sepia": {"bg": "#2b2115", "fg": "#ffb454", "muted": "#8a6a3a", "bar": "#40331f", "bar_fg": "#d8c39a", "prompt": "#ffd28f"},
+    "high_contrast": {"bg": "#000000", "fg": "#ffff00", "muted": "#aaaa00", "bar": "#1a1a1a", "bar_fg": "#ffffff", "prompt": "#00ff00"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "Noto Sans Mono", "DejaVu Sans Mono", monospace;
+    background: {{ p.bg }};
+    color: {{ p.fg }};
+  }
+  .titlebar {
+    background: {{ p.bar }}; color: {{ p.bar_fg }};
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px; font-family: "DejaVu Sans", sans-serif; font-size: 0.72em;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.r { background: #e5534b; } .dot.y { background: #d4a72c; } .dot.g { background: #57ab5a; }
+  .titlebar .title { flex: 1; text-align: center; }
+  .term { padding: 14px 18px; }
+  .line { display: flex; white-space: pre; line-height: 1.5; }
+  .prompt { color: {{ p.prompt }}; user-select: none; margin-right: 10px; flex-shrink: 0; }
+  .indent { display: inline-block; }
+  .cursor { display: inline-block; width: 9px; height: 1.1em; background: {{ p.fg }}; vertical-align: text-bottom; }
+{% endblock %}
+
+{% block content %}
+<div class="titlebar">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="title">devbox &mdash; ssh &mdash; 96&times;32</span>
+</div>
+<div class="term">
+{% for line in content.lines %}
+<div class="line"><span class="prompt">{{ "$" if line.indent == 0 else ">" }}</span><span class="indent" style="padding-left: {{ line.indent * 20 }}px;">{{ macros.render_words(line.tokens) }}</span></div>
+{% endfor %}
+<div class="line"><span class="prompt">$</span><span class="cursor"></span></div>
+</div>
+{% endblock %}

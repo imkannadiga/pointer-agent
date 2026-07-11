@@ -1,0 +1,44 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"bg": "#ffffff", "fg": "#222226", "muted": "#8b8b93", "banner": "#d81b60", "banner_fg": "#ffffff", "accent": "#d81b60"},
+    "dark": {"bg": "#141317", "fg": "#e9e7ee", "muted": "#8e8a99", "banner": "#880e4f", "banner_fg": "#fce4ec", "accent": "#f06292"},
+    "sepia": {"bg": "#f8f0dd", "fg": "#3e3220", "muted": "#95845e", "banner": "#7c3a10", "banner_fg": "#f8f0dd", "accent": "#9a3412"},
+    "high_contrast": {"bg": "#000000", "fg": "#ffffff", "muted": "#dddddd", "banner": "#ffff00", "banner_fg": "#000000", "accent": "#ffff00"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "DejaVu Sans", Verdana, sans-serif;
+    background: {{ p.bg }};
+    color: {{ p.fg }};
+  }
+  .mag-strip { display: flex; justify-content: space-between; padding: 10px 44px; font-size: 0.7em; letter-spacing: 3px; text-transform: uppercase; color: {{ p.muted }}; }
+  .mag-strip .brand { color: {{ p.accent }}; font-weight: bold; }
+  .banner { background: {{ p.banner }}; color: {{ p.banner_fg }}; margin: 0 0 22px 0; padding: 22px 44px; }
+  h1 { font-size: 2em; font-weight: bold; line-height: 1.15; margin: 0; }
+  .kicker { font-size: 0.7em; letter-spacing: 4px; text-transform: uppercase; opacity: 0.85; margin-bottom: 8px; }
+  .columns { display: flex; gap: 34px; padding: 0 44px; }
+  .column { flex: 1; }
+  .column p { margin: 0 0 15px 0; line-height: 1.6; font-size: 0.9em; }
+  .page-tag { position: absolute; bottom: 10px; right: 44px; font-size: 0.66em; color: {{ p.muted }}; letter-spacing: 2px; }
+{% endblock %}
+
+{% block content %}
+<div class="mag-strip"><span class="brand">VANTAGE</span><span>Culture &middot; Design &middot; Ideas</span><span>Issue 42</span></div>
+<div class="banner">
+  <div class="kicker">The Long Read</div>
+  <h1>{{ macros.render_structural(content.headline, tag="span") }}</h1>
+</div>
+<div class="columns">
+{% for col in content.columns %}
+  <div class="column">
+  {% for para in col.paragraphs %}
+  {{ macros.render_paragraph(para) }}
+  {% endfor %}
+  </div>
+{% endfor %}
+</div>
+<div class="page-tag">VANTAGE / 87</div>
+{% endblock %}

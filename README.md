@@ -66,7 +66,8 @@ crop→full-image coordinate-transform correctness test are recorded in
 ```
 pointer-agent/
 ├── data_gen/            # synthetic training-data generator (Playwright + Jinja2 + Faker)
-│   └── templates/        # HTML/CSS surface templates
+│   └── templates/        # HTML/CSS surface templates: templates/<surface>/ holds 6
+│                         # distinct real-world design variants per surface (42 total)
 ├── orchestrator/         # SLM planner -> VLM grounder -> SLM verifier pipeline
 ├── slm/                  # planner LoRA-SFT (Phase 2): dataset + train_sft.py
 ├── vlm/                  # grounder LoRA-SFT (Phase 1): dataset + train_sft.py
@@ -125,6 +126,25 @@ command line, e.g. `languages='[en]'` or
 `push_to_hub=true hub_repo_id=<you>/pointer-agent-synth`. Defaults to a local
 dry-run save (`datasets.save_to_disk`, no HF token needed); set `push_to_hub=true`
 + `hub_repo_id`/`hub_token` to actually push once credentials are available.
+
+Every surface has **6 template design variants**
+(`data_gen/templates/<surface>/*.html.j2`) — genuinely different real-world
+layouts, chrome, font stacks, and per-theme color schemes, not re-skins of
+one layout (e.g. `code_editor` renders as a dark VSCode-style IDE, a light
+IDE, a terminal, a Jupyter-style notebook, a diff view, or a plain editor).
+One variant is sampled uniformly per row with the row's seeded rng and
+recorded in the row's `template_variant` field, so per-variant breakdowns
+are possible downstream. Dropping a new `.html.j2` into a surface's
+directory adds it to the rotation — no code or config change.
+
+Parallelized across all CPU cores by default (`num_workers`, default `null`
+= `os.cpu_count()` — lower it on memory-constrained machines, since each
+worker runs its own Chromium instance) with a live `tqdm` progress bar. GPUs
+aren't relevant here — this pipeline is pure Playwright rendering + content
+generation, no model inference, so CPU cores are the only lever:
+```bash
+python -m data_gen.generate_dataset n_samples=5000 num_workers=8
+```
 
 Verify the output:
 
@@ -327,6 +347,29 @@ the Architecture section above for the design
   (14.85%, vs. 50-67% for direct-text/structural categories) — plausibly a
   genuinely harder task (no literal-text match available, semantic-only
   grounding) rather than a bug, and a candidate for more training investment.
+
+**Data-gen surface-variety hardening** (`data_gen/templates/`, `data_gen/render.py`)
+- Every surface now has 6 distinct real-world template designs (42 total,
+  in per-surface `templates/<surface>/` directories; the originals live on
+  as one variant each), differing in layout structure, decorative chrome,
+  font stack, and per-theme color palette — directly attacking the visual
+  half of the synthetic-vs-real surface-diversity gap (real
+  `pointerbench-text` spans 119 surfaces). The variant is sampled uniformly
+  per row (seeded rng, reproducible) and recorded in a new
+  `template_variant` metadata field.
+- Ground-truth integrity fix that fell out of this: layouts with inner
+  `overflow: hidden` containers (IDE panes, phone frames, chat widgets) can
+  clip text while its DOM rect stays in-viewport; `render.py` now hit-tests
+  each box's center via `elementFromPoint` and drops covered/clipped boxes.
+  Deliberate occlusion overlays are unaffected (`pointer-events: none` is
+  skipped by `elementFromPoint`), so the occlusion difficulty knob still
+  works.
+- Verified: 84-render sweep (42 variants × light+dark) with box-kind
+  assertions (incl. all 22 invoice fields present in every invoice variant),
+  visual inspection of every new design, 400-row generation run fully green
+  through `validate_schema.py`, and ground-truth overlay spot-checks on the
+  new layouts (caret/blank-line/invoice-field targets land exactly). See
+  `progress.md` section 5a.
 
 ### Pending
 

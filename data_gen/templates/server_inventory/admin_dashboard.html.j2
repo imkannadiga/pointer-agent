@@ -1,0 +1,66 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"bg": "#f1f4f8", "fg": "#1e293b", "muted": "#64748b", "side": "#0f172a", "side_fg": "#94a3b8", "side_hl": "#e2e8f0", "card": "#ffffff", "border": "#e2e8f0", "accent": "#2563eb", "stripe": "#f8fafc", "pill": "#dbeafe"},
+    "dark": {"bg": "#0b1120", "fg": "#e2e8f0", "muted": "#64748b", "side": "#020617", "side_fg": "#64748b", "side_hl": "#e2e8f0", "card": "#111a2e", "border": "#1e293b", "accent": "#3b82f6", "stripe": "#0e1627", "pill": "#1e3a5f"},
+    "sepia": {"bg": "#efe6cd", "fg": "#3d321c", "muted": "#94815a", "side": "#40331c", "side_fg": "#bfae87", "side_hl": "#f6ecd4", "card": "#f9f2df", "border": "#dbcca6", "accent": "#8a5a12", "stripe": "#f3ead2", "pill": "#e6d9b4"},
+    "high_contrast": {"bg": "#000000", "fg": "#ffffff", "muted": "#cccccc", "side": "#0a0a0a", "side_fg": "#ffffff", "side_hl": "#ffff00", "card": "#000000", "border": "#ffffff", "accent": "#ffff00", "stripe": "#111111", "pill": "#333300"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "Liberation Sans", Arial, sans-serif;
+    background: {{ p.bg }};
+    color: {{ p.fg }};
+    display: flex;
+  }
+  .side { width: 176px; flex-shrink: 0; height: 768px; background: {{ p.side }}; color: {{ p.side_fg }}; padding: 18px 0; box-sizing: border-box; font-size: 0.78em; }
+  .side .brand { color: {{ p.side_hl }}; font-weight: bold; font-size: 1.15em; padding: 0 18px 18px 18px; letter-spacing: 1px; }
+  .side .nav-item { padding: 8px 18px; }
+  .side .nav-item.active { color: {{ p.side_hl }}; background: rgba(128,128,128,0.18); border-left: 3px solid {{ p.accent }}; padding-left: 15px; }
+  .main { flex: 1; padding: 0 26px; box-sizing: border-box; }
+  .topbar { display: flex; align-items: center; padding: 13px 0; font-size: 0.8em; color: {{ p.muted }}; }
+  .search { border: 1px solid {{ p.border }}; background: {{ p.card }}; border-radius: 16px; padding: 5px 16px; width: 220px; }
+  .topbar .user { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .avatar { width: 24px; height: 24px; border-radius: 50%; background: {{ p.accent }}; }
+  h1 { font-size: 1.25em; margin: 4px 0 14px 0; }
+  .card { background: {{ p.card }}; border: 1px solid {{ p.border }}; border-radius: 8px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.82em; }
+  th { text-align: left; color: {{ p.muted }}; text-transform: uppercase; font-size: 0.82em; letter-spacing: 1px; padding: 8px 10px; border-bottom: 2px solid {{ p.border }}; }
+  td { padding: 8px 10px; border-bottom: 1px solid {{ p.border }}; }
+  tbody tr:nth-child(even) { background: {{ p.stripe }}; }
+  td:nth-child(3) .word { background: {{ p.pill }}; border-radius: 10px; padding: 1px 9px; }
+{% endblock %}
+
+{% block content %}
+<div class="side">
+  <div class="brand">OPSBOARD</div>
+  <div class="nav-item">Overview</div>
+  <div class="nav-item active">Servers</div>
+  <div class="nav-item">Alerts</div>
+  <div class="nav-item">Metrics</div>
+  <div class="nav-item">Deployments</div>
+  <div class="nav-item">Settings</div>
+</div>
+<div class="main">
+  <div class="topbar"><span class="search">Search resources&hellip;</span><span class="user"><span class="avatar"></span>admin</span></div>
+  <h1>{{ macros.render_structural(content.title, tag="span") }}</h1>
+  <div class="card">
+  <table>
+  <thead>
+  <tr>
+  {% for h in content.headers %}<th>{{ macros.render_words(h) }}</th>{% endfor %}
+  </tr>
+  </thead>
+  <tbody>
+  {% for row in content.rows %}
+  <tr>
+  {% for cell in row %}<td>{{ macros.render_words(cell) }}</td>{% endfor %}
+  </tr>
+  {% endfor %}
+  </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

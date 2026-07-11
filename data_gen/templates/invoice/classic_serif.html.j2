@@ -1,0 +1,80 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"bg": "#fffef8", "fg": "#1c1c1c", "muted": "#6d6d6d", "rule": "#1c1c1c"},
+    "dark": {"bg": "#24262a", "fg": "#e6e3da", "muted": "#9aa0a8", "rule": "#e6e3da"},
+    "sepia": {"bg": "#f7efdb", "fg": "#3a2e17", "muted": "#8d7c58", "rule": "#3a2e17"},
+    "high_contrast": {"bg": "#000000", "fg": "#ffffff", "muted": "#dddddd", "rule": "#ffff00"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "Liberation Serif", "Times New Roman", serif;
+    background: {{ p.bg }};
+    color: {{ p.fg }};
+    padding: 30px 70px;
+  }
+  h1 { font-size: 1.5em; text-align: center; letter-spacing: 5px; text-transform: uppercase; margin: 0 0 4px 0; }
+  .double-rule { border-bottom: 3px double {{ p.rule }}; width: 320px; margin: 0 auto 20px auto; }
+  .head-grid { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 0.86em; line-height: 1.6; }
+  .blk .cap { font-variant: small-caps; letter-spacing: 1px; color: {{ p.muted }}; }
+  .blk.right { text-align: right; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.86em; margin-bottom: 16px; }
+  th { border-top: 2px solid {{ p.rule }}; border-bottom: 1px solid {{ p.rule }}; text-align: left; padding: 6px 10px; font-variant: small-caps; letter-spacing: 1px; }
+  td { padding: 6px 10px; border-bottom: 1px solid {{ p.muted }}; }
+  .foot-grid { display: flex; justify-content: space-between; align-items: flex-start; }
+  .remit { font-size: 0.76em; color: {{ p.muted }}; line-height: 1.7; max-width: 420px; }
+  .remit .cap { font-variant: small-caps; color: {{ p.fg }}; }
+  .sums { font-size: 0.9em; text-align: right; line-height: 1.9; }
+  .sums .k { color: {{ p.muted }}; font-variant: small-caps; margin-right: 26px; }
+  .sums .grand { border-top: 2px solid {{ p.rule }}; font-weight: bold; padding-top: 4px; }
+{% endblock %}
+
+{% block content %}
+{% set f = content.fields %}
+<h1>Invoice</h1>
+<div class="double-rule"></div>
+<div class="head-grid">
+  <div class="blk">
+    <div class="cap">Remitter</div>
+    <div>{{ macros.render_field(f.invoice_sender) }}</div>
+    <div>{{ macros.render_field(f.invoice_sender_city) }}, {{ macros.render_field(f.invoice_sender_zip) }}</div>
+    <div>{{ macros.render_field(f.invoice_email) }}</div>
+    <div>{{ macros.render_field(f.invoice_phone) }}</div>
+  </div>
+  <div class="blk">
+    <div class="cap">Addressee</div>
+    <div>{{ macros.render_field(f.invoice_recipient) }}</div>
+    <div>{{ macros.render_field(f.invoice_recipient_city) }}, {{ macros.render_field(f.invoice_recipient_zip) }}</div>
+  </div>
+  <div class="blk right">
+    <div>N&ordm; {{ macros.render_field(f.invoice_number) }}</div>
+    <div>Date: {{ macros.render_field(f.invoice_date) }}</div>
+    <div>Payable by: {{ macros.render_field(f.invoice_due_date) }}</div>
+    <div>Tax reg.: {{ macros.render_field(f.invoice_tax_id) }}</div>
+  </div>
+</div>
+<table data-target-id="{{ content.line_items_container.id }}" data-kind="{{ content.line_items_container.kind }}" data-field="{{ content.line_items_container.field }}">
+<thead><tr><th>Description of goods and services</th></tr></thead>
+<tbody>
+{% for item in content.line_items %}
+<tr><td>{{ macros.render_field(item, tag="span") }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+<div class="foot-grid">
+  <div class="remit">
+    <div class="cap">Remittance information</div>
+    <div>IBAN: {{ macros.render_field(f.invoice_iban) }}</div>
+    <div>BIC/SWIFT: {{ macros.render_field(f.invoice_bic) }}</div>
+    <div>Bank: {{ macros.render_field(f.invoice_bank_details) }}</div>
+  </div>
+  <div class="sums">
+    <div><span class="k">Subtotal</span>{{ macros.render_field(f.invoice_subtotal) }}</div>
+    <div><span class="k">Tax</span>{{ macros.render_field(f.invoice_tax) }}</div>
+    <div><span class="k">Total</span>{{ macros.render_field(f.invoice_total) }}</div>
+    <div class="grand">{{ macros.render_field(f.invoice_totals) }}</div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"bg": "#fdfcf7", "fg": "#1e1e1e", "muted": "#6f6f6f", "rule": "#1e1e1e", "dots": "#8a8a8a", "stamp": "#8a2222"},
+    "dark": {"bg": "#26282c", "fg": "#e5e2d9", "muted": "#9aa0a8", "rule": "#e5e2d9", "dots": "#7d838b", "stamp": "#e57373"},
+    "sepia": {"bg": "#f7efd9", "fg": "#3a2e17", "muted": "#8d7c58", "rule": "#3a2e17", "dots": "#a08f68", "stamp": "#93401e"},
+    "high_contrast": {"bg": "#000000", "fg": "#ffffff", "muted": "#dddddd", "rule": "#ffff00", "dots": "#aaaaaa", "stamp": "#ffff00"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "Nimbus Roman", "Liberation Serif", serif;
+    background: {{ p.bg }};
+    color: {{ p.fg }};
+    padding: 34px 76px;
+  }
+  .form-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid {{ p.rule }}; padding-bottom: 8px; margin-bottom: 6px; }
+  .form-no { font-size: 0.72em; color: {{ p.muted }}; }
+  .stamp-box { border: 2px solid {{ p.stamp }}; color: {{ p.stamp }}; font-size: 0.6em; text-transform: uppercase; letter-spacing: 2px; padding: 5px 10px; transform: rotate(2deg); }
+  h1 { font-size: 1.3em; text-align: center; text-transform: uppercase; letter-spacing: 3px; margin: 14px 0 6px 0; }
+  .instructions { text-align: center; font-size: 0.72em; font-style: italic; color: {{ p.muted }}; margin-bottom: 24px; }
+  .field-row { display: flex; align-items: baseline; margin-bottom: 19px; gap: 12px; }
+  .field-label { font-size: 0.78em; text-transform: uppercase; letter-spacing: 1px; flex-shrink: 0; width: 210px; }
+  .field-value { flex: 1; border-bottom: 2px dotted {{ p.dots }}; padding: 0 6px 2px 6px; }
+  .office-box { margin-top: 26px; border: 1px solid {{ p.muted }}; padding: 8px 14px; font-size: 0.68em; color: {{ p.muted }}; text-transform: uppercase; letter-spacing: 1px; }
+{% endblock %}
+
+{% block content %}
+<div class="form-head">
+  <span class="form-no">Form B-27 (rev. 03/24)<br>Approval no. 1420-0114</span>
+  <span class="stamp-box">Received</span>
+</div>
+<h1>{{ macros.render_structural(content.title, tag="span") }}</h1>
+<div class="instructions">Please complete all sections in block capitals. Illegible forms will be returned.</div>
+{% for field in content.fields %}
+<div class="field-row" data-target-id="{{ field.id }}" data-kind="field-row">
+  <div class="field-label">{{ macros.render_words(field.label) }}</div>
+  <div class="field-value">{{ macros.render_words(field.value) }}</div>
+</div>
+{% endfor %}
+<div class="office-box">For official use only &mdash; do not write below this line</div>
+{% endblock %}

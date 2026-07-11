@@ -1,0 +1,50 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"bg": "#e9e5dc", "fg": "#33302a", "muted": "#8f887b", "accent": "#b45309", "card": "#fbf8f1", "bar": "#dcd7cb"},
+    "dark": {"bg": "#17161a", "fg": "#dcd9d2", "muted": "#8c8880", "accent": "#e0a458", "card": "#242229", "bar": "#0f0e12"},
+    "sepia": {"bg": "#e8dcbe", "fg": "#453518", "muted": "#95835c", "accent": "#92400e", "card": "#f8efd7", "bar": "#d9caa4"},
+    "high_contrast": {"bg": "#000000", "fg": "#ffffff", "muted": "#ffff00", "accent": "#ffff00", "card": "#0d0d0d", "bar": "#000000"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "Bitstream Charter", Georgia, serif;
+    background: {{ p.bg }};
+    color: {{ p.fg }};
+  }
+  .toolbar {
+    display: flex; align-items: center; gap: 8px;
+    background: {{ p.bar }}; padding: 10px 16px;
+    font-family: "DejaVu Sans", sans-serif; font-size: 0.75em; color: {{ p.muted }};
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.r { background: #e5534b; } .dot.y { background: #d4a72c; } .dot.g { background: #57ab5a; }
+  .toolbar .btn { margin-left: 18px; padding: 3px 10px; border: 1px solid {{ p.muted }}; border-radius: 4px; }
+  .toolbar .spacer { flex: 1; }
+  .note {
+    background: {{ p.card }}; border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+    border-left: 5px solid {{ p.accent }};
+    margin: 24px 90px; padding: 26px 34px; box-sizing: border-box;
+  }
+  h1 { font-size: 1.4em; font-style: italic; margin: 0 0 6px 0; color: {{ p.accent }}; }
+  .note-meta { font-family: "DejaVu Sans", sans-serif; font-size: 0.68em; color: {{ p.muted }}; margin-bottom: 18px; }
+  .note p { margin: 0 0 17px 0; line-height: 1.6; }
+{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+  <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+  <span class="btn">Aa</span><span class="btn">B</span><span class="btn">I</span><span class="btn">U</span>
+  <span class="spacer"></span><span>All notes synced</span>
+</div>
+<div class="note">
+  <h1>{{ macros.render_structural(content.title, tag="span") }}</h1>
+  <div class="note-meta">Edited yesterday &middot; Pinned</div>
+{% for para in content.paragraphs %}
+{{ macros.render_paragraph(para) }}
+{% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"bg": "#fbfbfb", "fg": "#26282b", "muted": "#7d8288", "head_bg": "#37474f", "head_fg": "#eceff1", "border": "#c9ced3", "alt_col": "#f0f2f4", "accent": "#c2185b"},
+    "dark": {"bg": "#16181b", "fg": "#d7dbdf", "muted": "#788087", "head_bg": "#263238", "head_fg": "#cfd8dc", "border": "#37393d", "alt_col": "#1d2023", "accent": "#f06292"},
+    "sepia": {"bg": "#f6eedb", "fg": "#3f3319", "muted": "#93825c", "head_bg": "#54431f", "head_fg": "#f4e9cd", "border": "#d3c49d", "alt_col": "#efe5ca", "accent": "#9a3412"},
+    "high_contrast": {"bg": "#000000", "fg": "#ffffff", "muted": "#cccccc", "head_bg": "#ffff00", "head_fg": "#000000", "border": "#ffffff", "alt_col": "#101010", "accent": "#00ffff"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "Liberation Sans Narrow", "Arial Narrow", "Liberation Sans", sans-serif;
+    background: {{ p.bg }};
+    color: {{ p.fg }};
+    padding: 16px 20px;
+  }
+  .grid-toolbar { display: flex; gap: 14px; align-items: baseline; margin-bottom: 10px; font-size: 0.74em; color: {{ p.muted }}; }
+  h1 { font-size: 1.05em; margin: 0; color: {{ p.accent }}; text-transform: uppercase; letter-spacing: 1px; }
+  .grid-toolbar .filter { border: 1px solid {{ p.border }}; padding: 2px 8px; border-radius: 2px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.78em; }
+  th { background: {{ p.head_bg }}; color: {{ p.head_fg }}; text-align: left; padding: 4px 8px; border: 1px solid {{ p.border }}; font-weight: bold; }
+  td { padding: 3px 8px; border: 1px solid {{ p.border }}; }
+  td:nth-child(even) { background: {{ p.alt_col }}; }
+  .count-line { margin-top: 8px; font-size: 0.7em; color: {{ p.muted }}; text-align: right; }
+{% endblock %}
+
+{% block content %}
+<div class="grid-toolbar">
+  <h1>{{ macros.render_structural(content.title, tag="span") }}</h1>
+  <span class="filter">env = production</span>
+  <span class="filter">state != retired</span>
+  <span style="margin-left:auto;">auto-refresh: 30s</span>
+</div>
+<table>
+<thead>
+<tr>
+{% for h in content.headers %}<th>{{ macros.render_words(h) }}</th>{% endfor %}
+</tr>
+</thead>
+<tbody>
+{% for row in content.rows %}
+<tr>
+{% for cell in row %}<td>{{ macros.render_words(cell) }}</td>{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+<div class="count-line">{{ content.rows | length }} records &middot; page 1</div>
+{% endblock %}

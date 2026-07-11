@@ -1,0 +1,88 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"bg": "#fafafa", "fg": "#212121", "muted": "#757575", "strip": "#212121", "strip_fg": "#fafafa", "accent": "#e91e63", "card": "#ffffff", "border": "#e0e0e0"},
+    "dark": {"bg": "#121212", "fg": "#e0e0e0", "muted": "#8a8a8a", "strip": "#000000", "strip_fg": "#ffffff", "accent": "#f48fb1", "card": "#1e1e1e", "border": "#333333"},
+    "sepia": {"bg": "#f4ebd3", "fg": "#3a2f19", "muted": "#93825c", "strip": "#3a2c12", "strip_fg": "#f4ebd3", "accent": "#a03518", "card": "#faf3e0", "border": "#dbcca6"},
+    "high_contrast": {"bg": "#000000", "fg": "#ffffff", "muted": "#cccccc", "strip": "#ffff00", "strip_fg": "#000000", "accent": "#00ffff", "card": "#0d0d0d", "border": "#ffffff"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "DejaVu Sans", Verdana, sans-serif;
+    background: {{ p.bg }};
+    color: {{ p.fg }};
+  }
+  .strip { background: {{ p.strip }}; color: {{ p.strip_fg }}; padding: 22px 46px; }
+  .strip .row1 { display: flex; justify-content: space-between; align-items: baseline; }
+  .strip .brand { font-size: 1.1em; font-weight: bold; }
+  .strip .brand:after { content: " STUDIO"; color: {{ p.accent }}; }
+  .strip .inv-no { font-size: 0.85em; }
+  .strip .row2 { display: flex; gap: 40px; margin-top: 10px; font-size: 0.74em; opacity: 0.92; }
+  .strip .k { opacity: 0.65; margin-right: 6px; text-transform: uppercase; letter-spacing: 1px; font-size: 0.9em; }
+  .wrap { padding: 20px 46px; }
+  .parties { display: flex; gap: 40px; margin-bottom: 18px; font-size: 0.82em; line-height: 1.6; }
+  .party .hd { color: {{ p.accent }}; font-weight: bold; font-size: 0.8em; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px; }
+  .party .sub { color: {{ p.muted }}; }
+  .items-card { background: {{ p.card }}; border: 1px solid {{ p.border }}; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+  .item-row { padding: 10px 18px; border-bottom: 1px solid {{ p.border }}; font-size: 0.86em; }
+  .item-row:last-child { border-bottom: none; }
+  .foot { display: flex; justify-content: space-between; align-items: flex-start; }
+  .bank { font-size: 0.74em; color: {{ p.muted }}; line-height: 1.8; }
+  .bank .hd { color: {{ p.fg }}; font-weight: bold; }
+  .sum-card { background: {{ p.card }}; border: 1px solid {{ p.border }}; border-radius: 10px; padding: 12px 20px; font-size: 0.86em; min-width: 280px; }
+  .s-row { display: flex; justify-content: space-between; padding: 4px 0; }
+  .s-row .k2 { color: {{ p.muted }}; }
+  .s-row.total { border-top: 2px solid {{ p.accent }}; margin-top: 6px; padding-top: 8px; font-weight: bold; }
+{% endblock %}
+
+{% block content %}
+{% set f = content.fields %}
+<div class="strip">
+  <div class="row1">
+    <span class="brand">HALCYON</span>
+    <span class="inv-no">Invoice {{ macros.render_field(f.invoice_number) }}</span>
+  </div>
+  <div class="row2">
+    <span><span class="k">Issued</span>{{ macros.render_field(f.invoice_date) }}</span>
+    <span><span class="k">Due</span>{{ macros.render_field(f.invoice_due_date) }}</span>
+    <span><span class="k">Tax ID</span>{{ macros.render_field(f.invoice_tax_id) }}</span>
+  </div>
+</div>
+<div class="wrap">
+  <div class="parties">
+    <div class="party">
+      <div class="hd">From</div>
+      <div>{{ macros.render_field(f.invoice_sender) }}</div>
+      <div>{{ macros.render_field(f.invoice_sender_city) }} {{ macros.render_field(f.invoice_sender_zip) }}</div>
+      <div class="sub">{{ macros.render_field(f.invoice_email) }}</div>
+      <div class="sub">{{ macros.render_field(f.invoice_phone) }}</div>
+    </div>
+    <div class="party">
+      <div class="hd">Billed to</div>
+      <div>{{ macros.render_field(f.invoice_recipient) }}</div>
+      <div>{{ macros.render_field(f.invoice_recipient_city) }} {{ macros.render_field(f.invoice_recipient_zip) }}</div>
+    </div>
+  </div>
+  <div class="items-card" data-target-id="{{ content.line_items_container.id }}" data-kind="{{ content.line_items_container.kind }}" data-field="{{ content.line_items_container.field }}">
+  {% for item in content.line_items %}
+    <div class="item-row">{{ macros.render_field(item, tag="span") }}</div>
+  {% endfor %}
+  </div>
+  <div class="foot">
+    <div class="bank">
+      <div class="hd">Pay by bank transfer</div>
+      <div>IBAN {{ macros.render_field(f.invoice_iban) }}</div>
+      <div>BIC {{ macros.render_field(f.invoice_bic) }}</div>
+      <div>{{ macros.render_field(f.invoice_bank_details) }}</div>
+    </div>
+    <div class="sum-card">
+      <div class="s-row"><span class="k2">Subtotal</span>{{ macros.render_field(f.invoice_subtotal) }}</div>
+      <div class="s-row"><span class="k2">Tax (19%)</span>{{ macros.render_field(f.invoice_tax) }}</div>
+      <div class="s-row"><span class="k2">Total</span>{{ macros.render_field(f.invoice_total) }}</div>
+      <div class="s-row total">{{ macros.render_field(f.invoice_totals) }}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

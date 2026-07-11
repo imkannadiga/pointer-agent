@@ -1,0 +1,37 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"bg": "#fbfbf8", "fg": "#333333", "muted": "#999999", "nick": "#0550ae", "bar": "#e8e8e2", "bar_fg": "#555555"},
+    "dark": {"bg": "#0f1419", "fg": "#bfbdb6", "muted": "#565b66", "nick": "#59c2ff", "bar": "#1f2430", "bar_fg": "#8a919c"},
+    "sepia": {"bg": "#2c2214", "fg": "#e0c188", "muted": "#7d6742", "nick": "#ffd28f", "bar": "#40331f", "bar_fg": "#c9ad78"},
+    "high_contrast": {"bg": "#000000", "fg": "#ffffff", "muted": "#aaaaaa", "nick": "#ffff00", "bar": "#111111", "bar_fg": "#ffffff"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "Liberation Mono", "Courier New", monospace;
+    background: {{ p.bg }};
+    color: {{ p.fg }};
+    display: flex; flex-direction: column;
+  }
+  .chan-bar { background: {{ p.bar }}; color: {{ p.bar_fg }}; padding: 6px 14px; font-size: 0.78em; display: flex; justify-content: space-between; }
+  .log { flex: 1; padding: 10px 14px; overflow: hidden; }
+  .message { line-height: 1.5; margin-bottom: 2px; }
+  .ts { color: {{ p.muted }}; margin-right: 8px; }
+  .nick { color: {{ p.nick }}; font-weight: bold; }
+  .nick:before { content: "<"; color: {{ p.muted }}; }
+  .nick:after { content: ">"; color: {{ p.muted }}; }
+  .m-text { margin-left: 8px; }
+  .input-line { border-top: 1px solid {{ p.muted }}; padding: 7px 14px; color: {{ p.muted }}; font-size: 0.85em; }
+{% endblock %}
+
+{% block content %}
+<div class="chan-bar"><span>#sysadmin &mdash; irc.libera.example</span><span>142 users</span></div>
+<div class="log">
+{% for m in content.messages %}
+<div class="message" data-target-id="{{ m.id }}" data-kind="message"><span class="ts">[{{ "%02d" % (13 + loop.index // 10) }}:{{ "%02d" % ((loop.index * 3 + 7) % 60) }}]</span><span class="nick">{{ macros.render_words(m.sender) }}</span><span class="m-text">{{ macros.render_words(m.text) }}</span></div>
+{% endfor %}
+</div>
+<div class="input-line">[#sysadmin] type /help for commands</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"bg": "#fefefe", "fg": "#383a42", "muted": "#a0a1a7", "chrome": "#eaeaeb", "gutter": "#f5f5f6", "border": "#d4d4d5", "hl": "#eef3fd", "accent": "#4078f2"},
+    "dark": {"bg": "#282c34", "fg": "#abb2bf", "muted": "#5c6370", "chrome": "#21252b", "gutter": "#2c313a", "border": "#3e4451", "hl": "#2c313c", "accent": "#61afef"},
+    "sepia": {"bg": "#f5edd8", "fg": "#453722", "muted": "#a5946c", "chrome": "#e8dcbd", "gutter": "#efe5ca", "border": "#d3c39c", "hl": "#eadfb9", "accent": "#8a5a12"},
+    "high_contrast": {"bg": "#000000", "fg": "#ffffff", "muted": "#cccccc", "chrome": "#0d0d0d", "gutter": "#050505", "border": "#ffffff", "hl": "#1a1a00", "accent": "#ffff00"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "Liberation Mono", "Courier New", monospace;
+    background: {{ p.bg }};
+    color: {{ p.fg }};
+    display: flex; flex-direction: column;
+  }
+  .menubar { background: {{ p.chrome }}; font-family: "Liberation Sans", Arial, sans-serif; font-size: 0.72em; color: {{ p.fg }}; padding: 6px 14px; display: flex; gap: 18px; border-bottom: 1px solid {{ p.border }}; }
+  .breadcrumb { font-family: "Liberation Sans", Arial, sans-serif; font-size: 0.7em; color: {{ p.muted }}; padding: 6px 16px; border-bottom: 1px solid {{ p.border }}; }
+  .code { flex: 1; padding-top: 6px; overflow: hidden; }
+  .line { display: flex; white-space: pre; line-height: 1.6; }
+  .line:nth-child(6) { background: {{ p.hl }}; }
+  .lineno { width: 52px; color: {{ p.muted }}; background: {{ p.gutter }}; border-right: 1px solid {{ p.border }}; user-select: none; text-align: right; padding-right: 12px; margin-right: 14px; flex-shrink: 0; box-sizing: border-box; }
+  .indent { display: inline-block; }
+  .statusbar { background: {{ p.chrome }}; border-top: 1px solid {{ p.border }}; color: {{ p.muted }}; font-family: "Liberation Sans", Arial, sans-serif; font-size: 0.68em; padding: 4px 16px; display: flex; justify-content: space-between; }
+  .statusbar .right { color: {{ p.accent }}; }
+{% endblock %}
+
+{% block content %}
+<div class="menubar"><span>File</span><span>Edit</span><span>Selection</span><span>View</span><span>Go</span><span>Run</span><span>Help</span></div>
+<div class="breadcrumb">src &rsaquo; services &rsaquo; worker.py</div>
+<div class="code">
+{% for line in content.lines %}
+<div class="line"><span class="lineno">{{ loop.index }}</span><span class="indent" style="padding-left: {{ line.indent * 24 }}px;">{{ macros.render_words(line.tokens) }}</span></div>
+{% endfor %}
+</div>
+<div class="statusbar"><span>Spaces: 4 &nbsp; UTF-8 &nbsp; LF</span><span class="right">Python &nbsp; Prettier</span></div>
+{% endblock %}

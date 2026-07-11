@@ -1,0 +1,59 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"bg": "#ffffff", "fg": "#24292e", "muted": "#8b949e", "chrome": "#f3f3f3", "side": "#ececec", "gutter": "#f8f8f8", "border": "#dddddd", "status": "#0a66c2", "kw": "#a626a4", "str": "#0b7a3e", "num": "#b25f00"},
+    "dark": {"bg": "#1e1e2e", "fg": "#cdd6f4", "muted": "#6c7086", "chrome": "#181825", "side": "#11111b", "gutter": "#1e1e2e", "border": "#313244", "status": "#3a5fcd", "kw": "#cba6f7", "str": "#a6e3a1", "num": "#fab387"},
+    "sepia": {"bg": "#f2e9d3", "fg": "#4a3a20", "muted": "#a08f68", "chrome": "#e6dabc", "side": "#dccfae", "gutter": "#ede2c8", "border": "#cbbc95", "status": "#7a5a1e", "kw": "#8a3a9a", "str": "#20642f", "num": "#9a4a00"},
+    "high_contrast": {"bg": "#000000", "fg": "#ffffff", "muted": "#bbbbbb", "chrome": "#0a0a0a", "side": "#050505", "gutter": "#000000", "border": "#ffffff", "status": "#ffff00", "kw": "#00ffff", "str": "#00ff00", "num": "#ffff00"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "DejaVu Sans Mono", Menlo, monospace;
+    background: {{ p.bg }};
+    color: {{ p.fg }};
+    display: flex;
+  }
+  .activity { width: 44px; height: 768px; background: {{ p.side }}; flex-shrink: 0; padding-top: 12px; box-sizing: border-box; }
+  .activity .icon { width: 20px; height: 20px; margin: 0 auto 18px auto; border: 2px solid {{ p.muted }}; border-radius: 4px; }
+  .activity .icon.on { border-color: {{ p.fg }}; }
+  .tree { width: 168px; height: 768px; background: {{ p.chrome }}; flex-shrink: 0; padding: 12px 0; box-sizing: border-box; font-family: "DejaVu Sans", sans-serif; font-size: 0.72em; color: {{ p.muted }}; border-right: 1px solid {{ p.border }}; }
+  .tree .hdr { text-transform: uppercase; letter-spacing: 1px; padding: 0 14px 8px 14px; font-size: 0.85em; }
+  .tree .file { padding: 3px 14px 3px 24px; }
+  .tree .file.open { color: {{ p.bg }}; background: {{ p.fg }}; }
+  .editor { flex: 1; display: flex; flex-direction: column; height: 768px; }
+  .tabs { display: flex; background: {{ p.chrome }}; font-family: "DejaVu Sans", sans-serif; font-size: 0.72em; }
+  .tab { padding: 8px 18px; color: {{ p.muted }}; border-right: 1px solid {{ p.border }}; }
+  .tab.active { background: {{ p.bg }}; color: {{ p.fg }}; border-top: 2px solid {{ p.status }}; }
+  .code { flex: 1; padding-top: 8px; overflow: hidden; }
+  .line { display: flex; white-space: pre; line-height: 1.55; }
+  .lineno { width: 44px; color: {{ p.muted }}; background: {{ p.gutter }}; user-select: none; text-align: right; padding-right: 14px; flex-shrink: 0; box-sizing: border-box; }
+  .indent { display: inline-block; }
+  .indent .word:nth-child(3n) { color: {{ p.kw }}; }
+  .indent .word:nth-child(4n+1) { color: {{ p.str }}; }
+  .indent .word:nth-child(5n+2) { color: {{ p.num }}; }
+  .statusbar { background: {{ p.status }}; color: #ffffff; font-family: "DejaVu Sans", sans-serif; font-size: 0.68em; padding: 3px 14px; display: flex; gap: 22px; }
+  {% if theme == "high_contrast" %}.statusbar { color: #000000; }{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="activity"><div class="icon on"></div><div class="icon"></div><div class="icon"></div><div class="icon"></div></div>
+<div class="tree">
+  <div class="hdr">Explorer</div>
+  <div class="file">config.yaml</div>
+  <div class="file open">main.py</div>
+  <div class="file">utils.py</div>
+  <div class="file">README.md</div>
+  <div class="file">tests/</div>
+</div>
+<div class="editor">
+  <div class="tabs"><span class="tab active">main.py</span><span class="tab">utils.py</span><span class="tab">config.yaml</span></div>
+  <div class="code">
+{% for line in content.lines %}
+<div class="line"><span class="lineno">{{ loop.index }}</span><span class="indent" style="padding-left: {{ line.indent * 24 }}px;">{{ macros.render_words(line.tokens) }}</span></div>
+{% endfor %}
+  </div>
+  <div class="statusbar"><span>main*</span><span>Python 3.11</span><span>Ln 12, Col 4</span><span>UTF-8</span></div>
+</div>
+{% endblock %}

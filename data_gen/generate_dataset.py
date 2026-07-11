@@ -4,6 +4,7 @@ Usage (from repo root, with deps installed and `playwright install chromium` run
 
     python -m data_gen.generate_dataset
     python -m data_gen.generate_dataset n_samples=500 output_dir=output/synthetic_v1
+    python -m data_gen.generate_dataset n_samples=500 num_workers=8
 
 Output layout matches the real pointerbench-text dataset:
     <output_dir>/images/0000.png, 0001.png, ...
@@ -16,21 +17,39 @@ regardless of how surface/content availability skews naive random sampling.
 A category unavailable for a chosen surface (see
 `task_builder.CATEGORY_SURFACES`) simply retries with a different surface,
 up to `cfg.max_retries_per_row`.
+
+Parallelized across CPU cores (not GPUs - this pipeline is pure Playwright
+rendering + Faker content generation + geometry, no model inference, so
+there's no GPU work to schedule). One worker process per core, each with its
+own Playwright browser instance created once and reused across every row
+that worker handles - launching a browser per row would dominate runtime.
+`num_workers` (config, default: all cores) controls the pool size; set it
+lower on memory-constrained machines, since each worker's Chromium instance
+has its own footprint.
 """
 import json
+import logging
 import os
 import random
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
+from tqdm import tqdm
 
 from data_gen.content_fillers import generate_content
 from data_gen.instruction_templates import phrase
-from data_gen.render import Renderer, render_html
+from data_gen.render import Renderer, list_variants, render_html
 from data_gen.task_builder import build_task, CATEGORY_SURFACES, languages_for_category
 from data_gen.push_to_hub import push_to_hub, save_local_hf_dataset
 
 IMAGE_SIZE = [1024, 768]
+
+logger = logging.getLogger(__name__)
+
+# Set once per worker process by _init_worker - a fresh Playwright browser
+# per process, reused across every task that process handles.
+_worker_renderer: Renderer | None = None
 
 
 def _pick_surface(category: str, cfg_surfaces: list, rng: random.Random) -> str | None:
@@ -57,8 +76,9 @@ def generate_row(index: int, category: str, cfg: DictConfig, renderer: Renderer,
     font_size = rng.choice(list(cfg.font_sizes))
     occlusion_box = _maybe_occlusion_box(rng, cfg.enable_occlusion)
 
+    variant = rng.choice(list_variants(surface))
     content = generate_content(surface, language, rng, enable_distractors=cfg.enable_distractors)
-    html = render_html(surface, content, theme, font_size, occlusion_box=occlusion_box)
+    html = render_html(surface, content, theme, font_size, occlusion_box=occlusion_box, variant=variant)
 
     file_name = f"{index:04d}.png"
     screenshot_path = os.path.join(images_dir, file_name)
@@ -88,6 +108,7 @@ def generate_row(index: int, category: str, cfg: DictConfig, renderer: Renderer,
         "anchor_bbox": task["anchor_bbox"],
         "relation": task["relation"],
         "relation_params": task["relation_params"],
+        "template_variant": variant,
     }
     return row
 
@@ -103,6 +124,40 @@ def _category_plan(n_samples: int, categories: list, seed: int) -> list:
     return plan
 
 
+def _init_worker(images_dir: str):
+    """Pool initializer: runs once per worker process. Creates one
+    Playwright browser for this worker's entire lifetime rather than one per
+    row - browser launch (~1-2s) would otherwise dominate runtime."""
+    global _worker_renderer
+    logging.basicConfig(level=logging.WARNING)
+    _worker_renderer = Renderer()
+    _worker_renderer.__enter__()
+    os.makedirs(images_dir, exist_ok=True)
+
+
+def _generate_slot(args: tuple) -> dict | None:
+    """One (slot_idx, category) plan entry -> a completed row, or None if
+    every retry failed. Each slot owns a reserved, collision-free block of
+    `max_retries_per_row` scratch indices (slot_idx * max_retries + attempt)
+    for rng-seeding and the intermediate image filename, so slots can run in
+    any order across any number of workers with no shared counter needed -
+    the existing post-generation re-sequencing pass compacts whatever
+    scratch indices succeeded into a contiguous final range."""
+    slot_idx, category, cfg_container, images_dir, max_retries = args
+    cfg = OmegaConf.create(cfg_container)
+    global _worker_renderer
+    for attempt in range(max_retries):
+        scratch_index = slot_idx * max_retries + attempt
+        try:
+            row = generate_row(scratch_index, category, cfg, _worker_renderer, images_dir)
+        except Exception:
+            logger.exception("generate_row failed for slot=%d category=%s attempt=%d", slot_idx, category, attempt)
+            row = None
+        if row is not None:
+            return row
+    return None
+
+
 @hydra.main(config_path="../configs/data_gen", config_name="config", version_base=None)
 def main(cfg: DictConfig):
     output_dir = hydra.utils.to_absolute_path(cfg.output_dir)
@@ -110,22 +165,35 @@ def main(cfg: DictConfig):
     os.makedirs(images_dir, exist_ok=True)
 
     plan = _category_plan(cfg.n_samples, list(cfg.categories), cfg.seed)
+    num_workers = cfg.num_workers or os.cpu_count() or 1
+    cfg_container = OmegaConf.to_container(cfg, resolve=True)
+    tasks = [
+        (slot_idx, category, cfg_container, images_dir, cfg.max_retries_per_row)
+        for slot_idx, category in enumerate(plan)
+    ]
 
     rows = []
-    with Renderer() as renderer:
-        index = 0
-        for category in plan:
-            row = None
-            for attempt in range(cfg.max_retries_per_row):
-                row = generate_row(index, category, cfg, renderer, images_dir)
-                if row is not None:
-                    break
-                index += 1  # burn the index so retry gets a fresh rng draw
+    # Playwright browsers must be created after forking, never shared across
+    # it - _init_worker (not this parent process) is what launches them, one
+    # per worker, so the default 'fork' start method on Linux is safe here.
+    with ProcessPoolExecutor(
+        max_workers=num_workers,
+        initializer=_init_worker,
+        initargs=(images_dir,),
+    ) as pool:
+        futures = [pool.submit(_generate_slot, task) for task in tasks]
+        for future in tqdm(as_completed(futures), total=len(futures), desc="Generating", unit="row"):
+            row = future.result()
             if row is not None:
                 rows.append(row)
-            index += 1
 
-    # Re-sequence file_name/id to be contiguous (retries can leave gaps).
+    # Re-sequence file_name/id to be contiguous (retries/failed slots leave
+    # gaps, and completion order is unrelated to slot order under
+    # parallelism) - sort by original scratch index first (as an int, not
+    # the zero-padded string, which sorts incorrectly once indices exceed
+    # 4 digits) so output is reproducibly ordered run-to-run regardless of
+    # worker scheduling.
+    rows.sort(key=lambda r: int(r["id"].rsplit("_", 1)[1]))
     final_rows = []
     for new_idx, row in enumerate(rows):
         old_name = row["file_name"]

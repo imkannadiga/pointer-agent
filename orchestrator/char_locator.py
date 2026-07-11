@@ -14,10 +14,14 @@ top-left-origin pixels before it leaves this file - see
 `tests/test_char_locator.py` for the correctness proof against a real
 Tesseract run.
 """
+import logging
+
 import pytesseract
 from PIL import Image, ImageOps
 
 from orchestrator.base import BaseCharLocator
+
+logger = logging.getLogger(__name__)
 
 UPSCALE = 4
 CROP_MARGIN_PX = 10
@@ -146,6 +150,11 @@ class TesseractCharLocator(BaseCharLocator):
         chars = _char_boxes(_prep_for_ocr(crop), offset)
         expected = len(anchor_phrase.replace(" ", ""))
         if not chars or expected == 0 or abs(len(chars) - expected) > max(2, expected // 2):
+            logger.warning(
+                "OCR sanity check failed for anchor_phrase=%r (expected %d chars, "
+                "OCR found %d) - falling back to anchor_bbox %s unchanged",
+                anchor_phrase, expected, len(chars), anchor_bbox,
+            )
             return list(anchor_bbox)
         x0 = min(c["x0"] for c in chars)
         y0 = min(c["y0"] for c in chars)

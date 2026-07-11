@@ -1,0 +1,59 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"bg": "#ffffff", "fg": "#202124", "muted": "#5f6368", "bar": "#1a73e8", "bar_fg": "#ffffff", "border": "#dadce0", "head_bg": "#e8f0fe", "accent": "#1a73e8", "btn": "#f1f3f4"},
+    "dark": {"bg": "#17191c", "fg": "#e8eaed", "muted": "#9aa0a6", "bar": "#0f3a72", "bar_fg": "#d2e3fc", "border": "#3c4043", "head_bg": "#1f2b3d", "accent": "#8ab4f8", "btn": "#26282b"},
+    "sepia": {"bg": "#f9f2e0", "fg": "#3b301b", "muted": "#8f7e58", "bar": "#6b4e15", "bar_fg": "#f9f2e0", "border": "#d9caa4", "head_bg": "#efe2c2", "accent": "#8a5a12", "btn": "#efe6cd"},
+    "high_contrast": {"bg": "#000000", "fg": "#ffffff", "muted": "#cccccc", "bar": "#ffff00", "bar_fg": "#000000", "border": "#ffffff", "head_bg": "#1a1a00", "accent": "#ffff00", "btn": "#111111"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "Nimbus Sans", Helvetica, Arial, sans-serif;
+    background: {{ p.bg }};
+    color: {{ p.fg }};
+  }
+  .appbar { background: {{ p.bar }}; color: {{ p.bar_fg }}; display: flex; align-items: center; gap: 16px; padding: 10px 20px; font-size: 0.82em; }
+  .appbar .logo { font-weight: bold; letter-spacing: 1px; }
+  .appbar .proj { border: 1px solid rgba(255,255,255,0.4); border-radius: 4px; padding: 3px 10px; }
+  .appbar .right { margin-left: auto; display: flex; gap: 14px; }
+  .breadcrumb { padding: 12px 24px 0 24px; font-size: 0.75em; color: {{ p.muted }}; }
+  .title-row { display: flex; align-items: center; padding: 6px 24px 14px 24px; }
+  h1 { font-size: 1.25em; font-weight: normal; margin: 0; }
+  .actions { margin-left: auto; display: flex; gap: 10px; font-size: 0.76em; }
+  .btn { background: {{ p.btn }}; border: 1px solid {{ p.border }}; border-radius: 4px; padding: 6px 14px; color: {{ p.accent }}; font-weight: bold; }
+  .btn.primary { background: {{ p.accent }}; color: {{ p.bg }}; border-color: {{ p.accent }}; }
+  table { border-collapse: collapse; width: calc(100% - 48px); margin: 0 24px; font-size: 0.8em; }
+  th { text-align: left; background: {{ p.head_bg }}; padding: 9px 12px; border-bottom: 1px solid {{ p.border }}; font-weight: bold; }
+  td { padding: 9px 12px; border-bottom: 1px solid {{ p.border }}; }
+  .pagination { display: flex; justify-content: flex-end; gap: 18px; padding: 12px 24px; font-size: 0.75em; color: {{ p.muted }}; }
+{% endblock %}
+
+{% block content %}
+<div class="appbar">
+  <span class="logo">&#9634; nimbus cloud</span>
+  <span class="proj">project: prod-eu-west</span>
+  <span class="right"><span>Docs</span><span>Support</span><span>&#9881;</span></span>
+</div>
+<div class="breadcrumb">Compute Engine &rsaquo; VM instances</div>
+<div class="title-row">
+  <h1>{{ macros.render_structural(content.title, tag="span") }}</h1>
+  <span class="actions"><span class="btn">&#8635; Refresh</span><span class="btn">Export</span><span class="btn primary">+ Create</span></span>
+</div>
+<table>
+<thead>
+<tr>
+{% for h in content.headers %}<th>{{ macros.render_words(h) }}</th>{% endfor %}
+</tr>
+</thead>
+<tbody>
+{% for row in content.rows %}
+<tr>
+{% for cell in row %}<td>{{ macros.render_words(cell) }}</td>{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+<div class="pagination"><span>Rows per page: 25</span><span>1&ndash;{{ content.rows | length }} of {{ content.rows | length }}</span><span>&lsaquo; &rsaquo;</span></div>
+{% endblock %}

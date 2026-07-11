@@ -52,6 +52,7 @@ def _features() -> Features:
                 "index": Value("int64"),
                 "second_anchor_phrase": Value("string"),
             },
+            "template_variant": Value("string"),
         }
     )
 

@@ -1,0 +1,70 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"bg": "#ffffff", "fg": "#1d1c1d", "muted": "#616061", "side": "#3f0e40", "side_fg": "#cfc3cf", "side_hl": "#ffffff", "border": "#e8e8e8", "accent": "#1264a3", "av1": "#e01e5a", "av2": "#36c5f0", "av3": "#2eb67d"},
+    "dark": {"bg": "#1a1d21", "fg": "#d1d2d3", "muted": "#9a9b9c", "side": "#121016", "side_fg": "#9d94a0", "side_hl": "#ffffff", "border": "#2c2d30", "accent": "#4c9fd6", "av1": "#e01e5a", "av2": "#36c5f0", "av3": "#2eb67d"},
+    "sepia": {"bg": "#f9f2e1", "fg": "#3a2f19", "muted": "#8d7d58", "side": "#4a3218", "side_fg": "#cbb890", "side_hl": "#f9f2e1", "border": "#ddd0ab", "accent": "#8a5a12", "av1": "#a03518", "av2": "#1e5aa0", "av3": "#3d6b1e"},
+    "high_contrast": {"bg": "#000000", "fg": "#ffffff", "muted": "#cccccc", "side": "#0d0d0d", "side_fg": "#dddddd", "side_hl": "#ffff00", "border": "#ffffff", "accent": "#00ffff", "av1": "#ffff00", "av2": "#00ffff", "av3": "#00ff00"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "Liberation Sans", Arial, sans-serif;
+    background: {{ p.bg }};
+    color: {{ p.fg }};
+    display: flex;
+  }
+  .workspace { width: 190px; flex-shrink: 0; height: 768px; background: {{ p.side }}; color: {{ p.side_fg }}; font-size: 0.8em; padding: 14px 0; box-sizing: border-box; }
+  .workspace .ws-name { color: {{ p.side_hl }}; font-weight: bold; font-size: 1.1em; padding: 0 16px 14px 16px; }
+  .workspace .section { padding: 8px 16px 4px 16px; text-transform: uppercase; font-size: 0.78em; letter-spacing: 1px; }
+  .workspace .chan { padding: 3px 16px; }
+  .workspace .chan.active { background: {{ p.accent }}; color: {{ p.side_hl }}; }
+  .chan:before { content: "# "; opacity: 0.7; }
+  .room { flex: 1; display: flex; flex-direction: column; height: 768px; }
+  .room-head { border-bottom: 1px solid {{ p.border }}; padding: 12px 20px; }
+  .room-head .chan-name { font-weight: bold; }
+  .room-head .topic { font-size: 0.75em; color: {{ p.muted }}; margin-top: 2px; }
+  .msgs { flex: 1; padding: 12px 20px; overflow: hidden; }
+  .message { display: flex; gap: 10px; margin-bottom: 12px; }
+  .av { width: 34px; height: 34px; border-radius: 6px; flex-shrink: 0; }
+  .message:nth-child(3n+1) .av { background: {{ p.av1 }}; }
+  .message:nth-child(3n+2) .av { background: {{ p.av2 }}; }
+  .message:nth-child(3n) .av { background: {{ p.av3 }}; }
+  .m-body { line-height: 1.4; }
+  .m-head .sender { font-weight: bold; margin-right: 8px; }
+  .m-head .ts { font-size: 0.7em; color: {{ p.muted }}; }
+  .m-text { font-size: 0.92em; }
+  .composer { border: 1px solid {{ p.border }}; border-radius: 8px; margin: 0 20px 16px 20px; padding: 10px 14px; color: {{ p.muted }}; font-size: 0.85em; }
+{% endblock %}
+
+{% block content %}
+<div class="workspace">
+  <div class="ws-name">acme-team</div>
+  <div class="section">Channels</div>
+  <div class="chan">general</div>
+  <div class="chan active">operations</div>
+  <div class="chan">incidents</div>
+  <div class="chan">random</div>
+  <div class="section">Direct messages</div>
+  <div class="chan">on-call</div>
+</div>
+<div class="room">
+  <div class="room-head">
+    <div class="chan-name"># operations</div>
+    <div class="topic">Deploys, alerts and day-to-day ops &middot; 48 members</div>
+  </div>
+  <div class="msgs">
+{% for m in content.messages %}
+  <div class="message" data-target-id="{{ m.id }}" data-kind="message">
+    <span class="av"></span>
+    <div class="m-body">
+      <div class="m-head"><span class="sender">{{ macros.render_words(m.sender) }}</span><span class="ts">{{ "%02d" % (8 + loop.index // 4) }}:{{ "%02d" % ((loop.index * 7) % 60) }}</span></div>
+      <div class="m-text">{{ macros.render_words(m.text) }}</div>
+    </div>
+  </div>
+{% endfor %}
+  </div>
+  <div class="composer">Message #operations</div>
+</div>
+{% endblock %}

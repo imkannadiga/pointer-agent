@@ -46,6 +46,7 @@ font_sizes: [13, 14, 16, 18, 20, 22]
 enable_distractors: true
 enable_occlusion: true
 max_retries_per_row: 5
+num_workers: null  # null = use all CPU cores (os.cpu_count()); lower this on memory-constrained machines
 output_dir: "output/synthetic_v0"
 seed: 42
 push_to_hub: false

@@ -1,0 +1,44 @@
+{% extends "base.html.j2" %}
+{% import "_macros.html.j2" as macros %}
+
+{% block extra_style %}
+  {% set PAL = {
+    "light": {"bg": "#ffffff", "fg": "#111111", "muted": "#666666", "frame": "#111111", "accent": "#d32f2f", "accent_fg": "#ffffff"},
+    "dark": {"bg": "#1a1a1a", "fg": "#f2f2f2", "muted": "#9a9a9a", "frame": "#f2f2f2", "accent": "#e53935", "accent_fg": "#ffffff"},
+    "sepia": {"bg": "#f6ecd2", "fg": "#33270e", "muted": "#8a7852", "frame": "#33270e", "accent": "#a03518", "accent_fg": "#f6ecd2"},
+    "high_contrast": {"bg": "#000000", "fg": "#ffffff", "muted": "#dddddd", "frame": "#ffff00", "accent": "#ffff00", "accent_fg": "#000000"},
+  } %}
+  {% set p = PAL.get(theme, PAL["light"]) %}
+  body {
+    font-family: "Liberation Sans Narrow", "Arial Narrow", "Liberation Sans", sans-serif;
+    background: {{ p.bg }};
+    color: {{ p.fg }};
+    padding: 16px 26px;
+    box-sizing: border-box;
+  }
+  .frame { border: 4px solid {{ p.frame }}; padding: 16px 22px; height: 704px; box-sizing: border-box; overflow: hidden; }
+  .flash { display: inline-block; background: {{ p.accent }}; color: {{ p.accent_fg }}; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; font-size: 0.72em; padding: 3px 12px; transform: rotate(-1.5deg); margin-bottom: 8px; }
+  h1 { font-size: 2.5em; text-transform: uppercase; font-weight: bold; line-height: 1.0; margin: 0 0 14px 0; letter-spacing: -1px; }
+  .columns { display: flex; gap: 20px; }
+  .column { flex: 1; }
+  .column p { margin: 0 0 11px 0; line-height: 1.4; font-size: 0.9em; }
+  .column p:first-child { font-weight: bold; }
+  .strap { border-top: 2px solid {{ p.frame }}; border-bottom: 2px solid {{ p.frame }}; padding: 4px 0; margin-bottom: 14px; font-size: 0.75em; font-weight: bold; text-transform: uppercase; display: flex; justify-content: space-between; color: {{ p.muted }}; }
+{% endblock %}
+
+{% block content %}
+<div class="frame">
+  <div class="flash">Exclusive</div>
+  <h1>{{ macros.render_structural(content.headline, tag="span") }}</h1>
+  <div class="strap"><span>Special investigation</span><span>Pages 4&ndash;5</span></div>
+  <div class="columns">
+  {% for col in content.columns %}
+    <div class="column">
+    {% for para in col.paragraphs %}
+    {{ macros.render_paragraph(para) }}
+    {% endfor %}
+    </div>
+  {% endfor %}
+  </div>
+</div>
+{% endblock %}
