@@ -18,6 +18,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 
 from orchestrator.grounder_florence2 import TASK_PROMPT
+from orchestrator.instances import format_grounding_phrase
 
 LOC_BINS = 1000
 
@@ -50,7 +51,13 @@ class GroundingSFTDataset(Dataset):
     def __getitem__(self, idx: int) -> dict:
         row = self.rows[idx]
         image = Image.open(os.path.join(self.images_dir, row["file_name"])).convert("RGB")
-        phrase = row["anchor_phrase"]
+        # Occurrence rows (relation_params.n) train on the same enriched
+        # referring expression ('the 2nd "X"') the grounder is handed at
+        # inference (orchestrator/grounder_florence2.py builds it from the
+        # same formatter), teaching Florence-2 to use the ordinal context
+        # to pick the right instance - never a phrase shape it won't see.
+        n = (row.get("relation_params") or {}).get("n")
+        phrase = format_grounding_phrase(row["anchor_phrase"], n)
         prompt = TASK_PROMPT + phrase
         # Trains on anchor_bbox (the anchor's own box), not row["bbox"] (the
         # task's final answer) - for relational categories these differ (e.g.

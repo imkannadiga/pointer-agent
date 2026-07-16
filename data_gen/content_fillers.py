@@ -10,6 +10,7 @@ that render.py reads back from a ``data-kind`` attribute, so task_builder.py
 can select targets by kind instead of guessing from shape.
 """
 import itertools
+import string
 
 from faker import Faker
 
@@ -45,6 +46,35 @@ INVOICE_FIELD_KEYS = [
 
 def _get_faker(language: str) -> Faker:
     return Faker(LOCALE_MAP[language])
+
+
+def _plant_repeats(texts: list[str], rng, prob: float = 0.7) -> list[str]:
+    """Deliberately plant 2-3 identical copies of one content word across the
+    given texts (pre-tagging, plain strings). Faker prose rarely repeats a
+    *content* word naturally, so occurrence-disambiguation tasks ("the
+    second X") would otherwise almost never trigger on prose/chat surfaces -
+    this guarantees a repeated anchor exists for task_builder.py to target.
+    Always >= 2 planted copies, because a token with trailing punctuation
+    ("word,") does not text-match a clean planted "word" - the planted
+    copies must repeat *each other*. Word-substitution keeps sentence
+    lengths/layout roughly identical."""
+    if rng.random() > prob:
+        return texts
+    candidates = [
+        w.strip(string.punctuation)
+        for t in texts for w in t.split()
+        if len(w.strip(string.punctuation)) >= 4 and w.strip(string.punctuation).isalpha()
+    ]
+    if not candidates:
+        return texts
+    target = rng.choice(candidates)
+    split = [t.split() for t in texts]
+    slots = [(ti, wi) for ti, words in enumerate(split) for wi in range(len(words))]
+    if len(slots) < 2:
+        return texts
+    for ti, wi in rng.sample(slots, min(rng.randint(2, 3), len(slots))):
+        split[ti][wi] = target
+    return [" ".join(words) for words in split]
 
 
 def _tag_word(word_id: str, text: str, with_chars: bool) -> dict:
@@ -85,31 +115,38 @@ def _tag_field(key: str, text: str, counter) -> dict:
     return {"id": f"f{next(counter):05d}", "kind": "field", "field": key, "text": text}
 
 
-def _raw_document(fake: Faker, rng, counter):
+def _raw_document(fake: Faker, rng, counter, enable_distractors: bool = False):
     struct_counter = itertools.count()
     para_counter = itertools.count()
     title_words = fake.sentence(nb_words=4).rstrip(".").split()
     title = _tag_structural(title_words, counter, struct_counter)
-    paragraphs = []
-    for _ in range(rng.randint(3, 5)):
-        text = fake.paragraph(nb_sentences=rng.randint(3, 5))
-        paragraphs.append(_tag_paragraph(text, counter, para_counter, with_chars=True))
+    texts = [fake.paragraph(nb_sentences=rng.randint(3, 5)) for _ in range(rng.randint(3, 5))]
+    if enable_distractors:
+        texts = _plant_repeats(texts, rng)
+    paragraphs = [_tag_paragraph(t, counter, para_counter, with_chars=True) for t in texts]
     return {"title": title, "paragraphs": paragraphs}
 
 
-def _raw_magazine_spread(fake: Faker, rng, counter):
+def _raw_magazine_spread(fake: Faker, rng, counter, enable_distractors: bool = False):
     struct_counter = itertools.count()
     para_counter = itertools.count()
     headline_words = fake.sentence(nb_words=6).rstrip(".").split()
     headline = _tag_structural(headline_words, counter, struct_counter)
     n_columns = rng.randint(2, 3)
-    columns = []
-    for _ in range(n_columns):
-        paragraphs = []
-        for _ in range(rng.randint(2, 4)):
-            text = fake.paragraph(nb_sentences=rng.randint(2, 4))
-            paragraphs.append(_tag_paragraph(text, counter, para_counter, with_chars=True))
+    col_sizes = [rng.randint(2, 4) for _ in range(n_columns)]
+    texts = [
+        fake.paragraph(nb_sentences=rng.randint(2, 4)) for _ in range(sum(col_sizes))
+    ]
+    if enable_distractors:
+        texts = _plant_repeats(texts, rng)
+    columns, i = [], 0
+    for size in col_sizes:
+        paragraphs = [
+            _tag_paragraph(t, counter, para_counter, with_chars=True)
+            for t in texts[i:i + size]
+        ]
         columns.append({"paragraphs": paragraphs})
+        i += size
     return {"headline": headline, "columns": columns}
 
 
@@ -146,14 +183,19 @@ def _raw_server_inventory(fake: Faker, rng, counter, enable_distractors: bool):
     return {"title": title, "headers": headers, "rows": rows}
 
 
-def _raw_chat_ui(fake: Faker, rng, counter):
+def _raw_chat_ui(fake: Faker, rng, counter, enable_distractors: bool = False):
     msg_counter = itertools.count()
     n_senders = rng.randint(2, 3)
     senders = [fake.first_name() for _ in range(n_senders)]
+    n_messages = rng.randint(8, 16)
+    chosen_senders = [rng.choice(senders) for _ in range(n_messages)]
+    texts = [
+        fake.sentence(nb_words=rng.randint(4, 12)).rstrip(".") for _ in range(n_messages)
+    ]
+    if enable_distractors:
+        texts = _plant_repeats(texts, rng)
     messages = []
-    for _ in range(rng.randint(8, 16)):
-        sender = rng.choice(senders)
-        text = fake.sentence(nb_words=rng.randint(4, 12)).rstrip(".")
+    for sender, text in zip(chosen_senders, texts):
         messages.append({
             "id": f"m{next(msg_counter):05d}",
             "sender": _tag_words(sender.split(), counter),
@@ -230,13 +272,19 @@ def _raw_invoice(fake: Faker, rng, counter, enable_distractors: bool):
 
 
 _RAW_BUILDERS = {
-    "document": lambda fake, rng, counter, enable_distractors: _raw_document(fake, rng, counter),
+    "document": lambda fake, rng, counter, enable_distractors: _raw_document(
+        fake, rng, counter, enable_distractors
+    ),
     "code_editor": lambda fake, rng, counter, enable_distractors: _raw_code_editor(fake, rng, counter),
     "server_inventory": lambda fake, rng, counter, enable_distractors: _raw_server_inventory(
         fake, rng, counter, enable_distractors
     ),
-    "magazine_spread": lambda fake, rng, counter, enable_distractors: _raw_magazine_spread(fake, rng, counter),
-    "chat_ui": lambda fake, rng, counter, enable_distractors: _raw_chat_ui(fake, rng, counter),
+    "magazine_spread": lambda fake, rng, counter, enable_distractors: _raw_magazine_spread(
+        fake, rng, counter, enable_distractors
+    ),
+    "chat_ui": lambda fake, rng, counter, enable_distractors: _raw_chat_ui(
+        fake, rng, counter, enable_distractors
+    ),
     "form": lambda fake, rng, counter, enable_distractors: _raw_form(fake, rng, counter),
     "invoice": lambda fake, rng, counter, enable_distractors: _raw_invoice(fake, rng, counter, enable_distractors),
 }

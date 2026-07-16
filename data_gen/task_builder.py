@@ -35,6 +35,7 @@ import re
 import string
 
 from data_gen.instruction_templates import FIELD_LABELS as _FIELD_LABELS
+from orchestrator.instances import occurrence_index
 
 LINE_CLUSTER_TOL_PX = 6
 CARET_WIDTH_PX = 2
@@ -97,6 +98,34 @@ def _words_in_paragraph(words, para, eps=1):
         if w["x0"] >= para["x0"] - eps and w["x1"] <= para["x1"] + eps
         and w["y0"] >= para["y0"] - eps and w["y1"] <= para["y1"] + eps
     ]
+
+
+def _same_text_instances(words, chosen):
+    text = chosen["text"].strip().lower()
+    return [w for w in words if w["text"].strip().lower() == text]
+
+
+def _word_occurrence(words, chosen):
+    """1-based reading-order index of `chosen` among the page's word boxes
+    with the same text, or None when the text is unique (nothing to
+    disambiguate). Uses the same sort orchestrator/pipeline.py applies to
+    the VLM's candidate boxes at inference, so the index means the same
+    thing on both sides."""
+    same = _same_text_instances(words, chosen)
+    if len(same) < 2:
+        return None
+    return occurrence_index(
+        same, chosen, bbox_of=lambda w: (w["x0"], w["y0"], w["x1"], w["y1"])
+    )
+
+
+def _prefer_unique(words, candidates, rng):
+    """Pick a candidate whose text is unique on the page when possible -
+    for word-anchored categories that have no occurrence phrasing, a
+    repeated anchor makes the ground truth ambiguous (the instruction can't
+    say WHICH instance), so repeats are avoided rather than disambiguated."""
+    unique = [w for w in candidates if len(_same_text_instances(words, w)) == 1]
+    return rng.choice(unique or candidates)
 
 
 def _occurrence(wchars, target_id, ch_text):
@@ -203,16 +232,20 @@ def build_word_center_task(boxes, rng, language, phrase_fn):
     box = rng.choice(words)
     bbox = _round_box(box)
     point = _bbox_center(bbox)
-    instruction = phrase_fn("word_center", language, rng, text=box["text"])
+    # Repeated anchor text -> occurrence-disambiguated instruction ("the
+    # second X") + relation_params.n, instead of an ambiguous "click X"
+    # whose ground truth is one arbitrary instance among several.
+    n = _word_occurrence(words, box)
+    instruction = phrase_fn("word_center", language, rng, text=box["text"], occurrence=n)
     task = _point_task(bbox, point, "word_center", "word", instruction)
-    return _finish(task, box["text"], "self")
+    return _finish(task, box["text"], "self", relation_params={"n": n} if n else {})
 
 
 def build_word_bbox_task(boxes, rng, language, phrase_fn):
     words = _words(boxes)
     if not words:
         return None
-    box = rng.choice(words)
+    box = _prefer_unique(words, words, rng)
     bbox = _round_box(box)
     point = _bbox_center(bbox)
     instruction = phrase_fn("word_bbox", language, rng, text=box["text"])
@@ -339,9 +372,14 @@ def build_caret_before_word_task(boxes, rng, language, phrase_fn):
     x = word["x0"]
     bbox = [round(x - CARET_WIDTH_PX), round(word["y0"]), round(x), round(word["y1"])]
     point = [round(x), round((word["y0"] + word["y1"]) / 2)]
-    instruction = phrase_fn("caret_before_word", language, rng, text=word["text"])
+    n = _word_occurrence(words, word)
+    instruction = phrase_fn("caret_before_word", language, rng, text=word["text"], occurrence=n)
     task = _point_task(bbox, point, "caret_before_word", "caret", instruction)
-    return _finish(task, word["text"], "before_word", anchor_bbox=_round_box(word))
+    return _finish(
+        task, word["text"], "before_word",
+        relation_params={"n": n} if n else {},
+        anchor_bbox=_round_box(word),
+    )
 
 
 def build_caret_after_word_task(boxes, rng, language, phrase_fn):
@@ -352,9 +390,14 @@ def build_caret_after_word_task(boxes, rng, language, phrase_fn):
     x = word["x1"]
     bbox = [round(x), round(word["y0"]), round(x + CARET_WIDTH_PX), round(word["y1"])]
     point = [round(x), round((word["y0"] + word["y1"]) / 2)]
-    instruction = phrase_fn("caret_after_word", language, rng, text=word["text"])
+    n = _word_occurrence(words, word)
+    instruction = phrase_fn("caret_after_word", language, rng, text=word["text"], occurrence=n)
     task = _point_task(bbox, point, "caret_after_word", "caret", instruction)
-    return _finish(task, word["text"], "after_word", anchor_bbox=_round_box(word))
+    return _finish(
+        task, word["text"], "after_word",
+        relation_params={"n": n} if n else {},
+        anchor_bbox=_round_box(word),
+    )
 
 
 def build_caret_between_chars_task(boxes, rng, language, phrase_fn):
@@ -370,13 +413,18 @@ def build_caret_between_chars_task(boxes, rng, language, phrase_fn):
     y0, y1 = min(c1["y0"], c2["y0"]), max(c1["y1"], c2["y1"])
     bbox = [round(x - CARET_WIDTH_PX / 2), round(y0), round(x + CARET_WIDTH_PX / 2), round(y1)]
     point = [round(x), round((y0 + y1) / 2)]
+    n = _word_occurrence(words, word)
     instruction = phrase_fn(
-        "caret_between_chars", language, rng, ch1=c1["text"], ch2=c2["text"], text=word["text"]
+        "caret_between_chars", language, rng,
+        ch1=c1["text"], ch2=c2["text"], text=word["text"], occurrence=n,
     )
     task = _point_task(bbox, point, "caret_between_chars", "caret", instruction)
+    params = {"char1": c1["text"], "char2": c2["text"], "index": i}
+    if n:
+        params["n"] = n
     return _finish(
         task, word["text"], "between_chars",
-        relation_params={"char1": c1["text"], "char2": c2["text"], "index": i},
+        relation_params=params,
         anchor_bbox=_round_box(word),
     )
 
@@ -390,7 +438,7 @@ def build_char_center_task(boxes, rng, language, phrase_fn):
     candidates = [w for w in words if _word_chars(chars, w["id"])]
     if not candidates:
         return None
-    word = rng.choice(candidates)
+    word = _prefer_unique(words, candidates, rng)
     wchars = _word_chars(chars, word["id"])
     ch = rng.choice(wchars)
     bbox = _round_box(ch)
@@ -410,7 +458,7 @@ def build_char_bbox_task(boxes, rng, language, phrase_fn):
     candidates = [w for w in words if _word_chars(chars, w["id"])]
     if not candidates:
         return None
-    word = rng.choice(candidates)
+    word = _prefer_unique(words, candidates, rng)
     wchars = _word_chars(chars, word["id"])
     ch = rng.choice(wchars)
     bbox = _round_box(ch)
@@ -518,11 +566,20 @@ def build_between_words_task(boxes, rng, language, phrase_fn):
     y0, y1 = min(w1["y0"], w2["y0"]), max(w1["y1"], w2["y1"])
     bbox = [round(x - 4), round(y0), round(x + 4), round(y1)]
     point = [round(x), round((y0 + y1) / 2)]
-    instruction = phrase_fn("between_words", language, rng, text1=w1["text"], text2=w2["text"])
+    # The ordinal disambiguates the FIRST anchor only - the second anchor
+    # rides along as a raw phrase (relation_params keeps its single
+    # second_anchor_phrase shape, per the section-4b two-anchor decision).
+    n = _word_occurrence(_words(boxes), w1)
+    instruction = phrase_fn(
+        "between_words", language, rng, text1=w1["text"], text2=w2["text"], occurrence=n
+    )
     task = _point_task(bbox, point, "between_words", "word", instruction)
+    params = {"second_anchor_phrase": w2["text"]}
+    if n:
+        params["n"] = n
     return _finish(
         task, w1["text"], "between_anchors",
-        relation_params={"second_anchor_phrase": w2["text"]},
+        relation_params=params,
         anchor_bbox=_round_box(w1),
     )
 

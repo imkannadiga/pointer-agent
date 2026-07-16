@@ -371,16 +371,40 @@ the Architecture section above for the design
   new layouts (caret/blank-line/invoice-field targets land exactly). See
   `progress.md` section 5a.
 
+**Occurrence disambiguation — the `nth_instance` machinery** (`orchestrator/instances.py`, `orchestrator/`, `data_gen/`)
+- Directly targets the real-eval failure signature above ("found a match,
+  not *the* match"): the planner contract gains an optional
+  `relation_params.n` (1-based occurrence index, composable with every
+  relation), the grounder returns **all** candidate boxes instead of just
+  the first, and the pipeline deterministically picks the nth candidate in
+  reading order (top-to-bottom, left-to-right) — plain geometry, no model
+  asked to count, per the Sprint 4 principle.
+- `orchestrator/instances.py` is the single source of truth for the
+  reading-order sort (shared by data-gen ground truth and pipeline
+  inference) and for the enriched grounding phrase (`the 2nd "Submit"`)
+  handed to Florence-2 — built identically at SFT time (`vlm/dataset.py`)
+  and inference time, so the ordinal context survives the SLM→VLM handoff
+  instead of being truncated to the bare word.
+- Data-gen now *plants* 2-3 copies of a content word on prose/chat surfaces
+  (tables and code repeat naturally) and, whenever a chosen anchor repeats
+  on-page, phrases the instruction with the ordinal ("the second X",
+  "das 2. Vorkommen von X", all 6 languages) and records `n` — which also
+  removes the previous silent ambiguity of "click X" with several X's on
+  screen. Word-anchored categories without ordinal phrasing
+  (`word_bbox`/`char_center`/`char_bbox`) now prefer unique anchors instead.
+- Covered by `tests/test_instances.py` (reading-order, clamping, formatter,
+  and stub-pipeline selection tests).
+
 ### Pending
 
-**Data-gen hardening for instruction-phrasing complexity** (new, evidenced by the real-eval result above)
-- Occurrence-disambiguation phrasing ("the third X", "the first occurrence
-  of Y") for categories like `between_words`/`caret_between_chars`.
+**Data-gen hardening for instruction-phrasing complexity** (evidenced by the real-eval result above)
 - The **attribute-based (styling)** task family from the original spec
   (section 1.6) — planned at kickoff, never implemented in `data_gen/` in
   any sprint; confirmed via real-eval evidence to be a load-bearing gap.
 - Longer embedded-context instructions, and occasional generic/function-word
   anchors rather than always-distinctive content words.
+- ~~Occurrence-disambiguation phrasing~~ — done, see the `nth_instance`
+  machinery above.
 
 **W&B experiment tracking** (spec requirement, not yet wired up)
 - `slm/train_sft.py` and `vlm/train_sft.py` currently set `report_to=[]` —

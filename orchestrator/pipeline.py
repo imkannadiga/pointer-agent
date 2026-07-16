@@ -7,12 +7,20 @@ Rewired in Sprint 4 (see progress.md section 4b) around the planner's fixed
 grounds a second phrase and computes the gap geometrically (no locator
 involved); every other relation is handed off to a `BaseCharLocator` to
 resolve precisely from a crop around the grounded anchor.
+
+Occurrence disambiguation ("the 2nd X"): when the planner emits
+`relation_params.n`, the anchor is picked as the nth of the grounder's
+candidate boxes in reading order (`orchestrator/instances.py`) - plain
+deterministic geometry, per the section-4b principle that ordinal counting
+is never asked of a model. Composes with every relation, since n selects
+the *anchor*, and the relation then resolves off that anchor as usual.
 """
 import re
 
 from PIL import Image
 
 from orchestrator.base import BaseCharLocator, BaseGrounder, BasePlanner, BaseVerifier
+from orchestrator.instances import select_nth
 
 _PUNCT_RE = re.compile(r"[^\w\s]")
 
@@ -82,14 +90,30 @@ class Pipeline:
 
         return prediction
 
+    def _ground_anchor(self, image: Image.Image, query: dict) -> dict:
+        """Ground the anchor phrase, then - if the query carries an
+        occurrence index (relation_params.n) and the grounder surfaced
+        multiple candidate boxes - pick the nth candidate in reading order
+        instead of blindly trusting the first match. With zero or one
+        candidate there is nothing to disambiguate (a grounder SFT'd on
+        occurrence phrases typically returns the one right box already), so
+        the grounder's own answer stands."""
+        prediction = self.grounder.ground(image, query)
+        n = (query.get("relation_params") or {}).get("n")
+        picked = select_nth(prediction.get("candidates") or [], n)
+        if picked is None:
+            return {"point": prediction["point"], "bbox": prediction["bbox"]}
+        point = [round((picked[0] + picked[2]) / 2), round((picked[1] + picked[3]) / 2)]
+        return {"point": point, "bbox": picked}
+
     def _resolve(self, image: Image.Image, query: dict) -> dict:
         relation = query.get("relation", "self")
         if relation == "self":
-            return self.grounder.ground(image, query)
+            return self._ground_anchor(image, query)
         if relation == "between_anchors":
             return self._resolve_between_anchors(image, query)
 
-        anchor_prediction = self.grounder.ground(image, query)
+        anchor_prediction = self._ground_anchor(image, query)
         if self.char_locator is None:
             # No locator configured: best-effort fallback to the anchor's
             # own grounded box rather than failing outright.
@@ -104,7 +128,7 @@ class Pipeline:
         )
 
     def _resolve_between_anchors(self, image: Image.Image, query: dict) -> dict:
-        first = self.grounder.ground(image, query)
+        first = self._ground_anchor(image, query)
         second_phrase = (query.get("relation_params") or {}).get("second_anchor_phrase")
         if not second_phrase or not hasattr(self.grounder, "ground_phrase"):
             return first

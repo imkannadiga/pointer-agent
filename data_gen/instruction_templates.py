@@ -131,6 +131,55 @@ BBOX_VERBS = {
     ],
 }
 
+# Occurrence disambiguation ("the second X", "das 2. Vorkommen von X") -
+# used whenever the anchor text appears more than once on the page, so the
+# instruction pins down WHICH instance is meant (real pointerbench-text
+# does exactly this - see progress.md section 4d). Word ordinals cover the
+# common 1..5; beyond that a numeric ordinal notation is used ("12th" /
+# "12." style), which is what a real UI instruction would do anyway.
+ORDINAL_WORDS = {
+    "en": {1: "first", 2: "second", 3: "third", 4: "fourth", 5: "fifth"},
+    "de": {1: "erste", 2: "zweite", 3: "dritte", 4: "vierte", 5: "fünfte"},
+    "fr": {1: "première", 2: "deuxième", 3: "troisième", 4: "quatrième", 5: "cinquième"},
+    "es": {1: "primera", 2: "segunda", 3: "tercera", 4: "cuarta", 5: "quinta"},
+    "it": {1: "prima", 2: "seconda", 3: "terza", 4: "quarta", 5: "quinta"},
+    "nl": {1: "eerste", 2: "tweede", 3: "derde", 4: "vierde", 5: "vijfde"},
+}
+
+OCCURRENCE_FRAMES = {
+    "en": ['the {ordinal} "{text}"', 'the {ordinal} occurrence of "{text}"'],
+    "de": ['das {ordinal} "{text}"', 'das {ordinal} Vorkommen von "{text}"'],
+    "fr": ['le {ordinal} "{text}"', 'la {ordinal} occurrence de "{text}"'],
+    "es": ['el {ordinal} "{text}"', 'la {ordinal} aparición de "{text}"'],
+    "it": ['il {ordinal} "{text}"', 'la {ordinal} occorrenza di "{text}"'],
+    "nl": ['de {ordinal} "{text}"', 'het {ordinal} voorkomen van "{text}"'],
+}
+
+
+def _ordinal_word(lang: str, n: int) -> str:
+    word = ORDINAL_WORDS[lang].get(n)
+    if word:
+        return word
+    if lang == "en":
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10 if not 10 <= n % 100 <= 20 else 0, "th")
+        return f"{n}{suffix}"
+    return f"{n}."
+
+
+def _occ_ref(lang: str, text: str, n: int, rng) -> str:
+    frame = rng.choice(OCCURRENCE_FRAMES[lang])
+    return frame.format(ordinal=_ordinal_word(lang, n), text=text)
+
+
+def _maybe_occ(lang: str, kw: dict) -> str:
+    """The quoted anchor text, ordinal-qualified when kw carries an
+    occurrence index."""
+    n = kw.get("occurrence")
+    if n:
+        return _occ_ref(lang, kw["text"], n, kw["rng"])
+    return f'"{kw["text"]}"'
+
+
 CHAR_NOUN = {"en": "the character", "de": "das Zeichen", "fr": "le caractère", "es": "el carácter", "it": "il carattere", "nl": "het teken"}
 IN_WORD = {"en": "in", "de": "in", "fr": "dans", "es": "en", "it": "in", "nl": "in"}
 BETWEEN = {"en": "between", "de": "zwischen", "fr": "entre", "es": "entre", "it": "tra", "nl": "tussen"}
@@ -175,19 +224,20 @@ def _ref_char(lang, **kw):
 
 
 def _ref_between_words(lang, **kw):
-    return f'{BETWEEN[lang]} "{kw["text1"]}" {AND[lang]} "{kw["text2"]}"'
+    first = _maybe_occ(lang, {**kw, "text": kw["text1"]})
+    return f'{BETWEEN[lang]} {first} {AND[lang]} "{kw["text2"]}"'
 
 
 def _ref_caret_before(lang, **kw):
-    return f'{JUST_BEFORE[lang]} "{kw["text"]}"'
+    return f'{JUST_BEFORE[lang]} {_maybe_occ(lang, kw)}'
 
 
 def _ref_caret_after(lang, **kw):
-    return f'{JUST_AFTER[lang]} "{kw["text"]}"'
+    return f'{JUST_AFTER[lang]} {_maybe_occ(lang, kw)}'
 
 
 def _ref_caret_between_chars(lang, **kw):
-    return f'{BETWEEN[lang]} "{kw["ch1"]}" {AND[lang]} "{kw["ch2"]}" {IN_WORD[lang]} "{kw["text"]}"'
+    return f'{BETWEEN[lang]} "{kw["ch1"]}" {AND[lang]} "{kw["ch2"]}" {IN_WORD[lang]} {_maybe_occ(lang, kw)}'
 
 
 def _ref_paragraph_bbox(lang, **kw):
@@ -256,10 +306,19 @@ BBOX_CATEGORIES = {
 
 
 def phrase(category: str, language: str, rng, **kwargs) -> str:
+    kwargs.setdefault("rng", rng)  # occurrence frames need it for variety
+
+    # Occurrence-disambiguated word_center bypasses the hand-written
+    # TEMPLATES (which have no slot for an ordinal) and composes the same
+    # verb-frame + referent construction the Sprint-3 categories use.
+    if category == "word_center" and kwargs.get("occurrence"):
+        ref = _occ_ref(language, kwargs["text"], kwargs["occurrence"], rng)
+        return rng.choice(POINT_VERBS[language]).format(ref=ref)
+
     if category in TEMPLATES:
         options = TEMPLATES[category].get(language) or TEMPLATES[category]["en"]
         tmpl = rng.choice(options)
-        return tmpl.format(**kwargs)
+        return tmpl.format(**{k: v for k, v in kwargs.items() if k != "rng"})
 
     builder = REF_BUILDERS[category]
     ref = builder(language, **kwargs)

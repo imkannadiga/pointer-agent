@@ -51,6 +51,7 @@ def _features() -> Features:
                 "char2": Value("string"),
                 "index": Value("int64"),
                 "second_anchor_phrase": Value("string"),
+                "n": Value("int64"),
             },
             "template_variant": Value("string"),
         }
@@ -58,7 +59,7 @@ def _features() -> Features:
 
 
 _RELATION_PARAM_KEYS = (
-    "target_char", "occurrence", "char1", "char2", "index", "second_anchor_phrase",
+    "target_char", "occurrence", "char1", "char2", "index", "second_anchor_phrase", "n",
 )
 
 

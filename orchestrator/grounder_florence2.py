@@ -5,6 +5,7 @@ from PIL import Image
 from transformers import AutoModelForCausalLM, AutoProcessor
 
 from orchestrator.base import BaseGrounder
+from orchestrator.instances import format_grounding_phrase
 
 TASK_PROMPT = "<CAPTION_TO_PHRASE_GROUNDING>"
 
@@ -32,7 +33,13 @@ class Florence2Grounder(BaseGrounder):
         self.device = device
 
     def ground(self, image: Image.Image, query: dict) -> dict:
-        return self.ground_phrase(image, query["anchor_phrase"])
+        # When the query carries an occurrence index (relation_params.n),
+        # the phrase handed to Florence-2 keeps that context ('the 2nd
+        # "Submit"') instead of truncating it to the bare word - same
+        # enriched shape vlm/dataset.py trains on. The deterministic nth
+        # selection over the returned candidates happens in pipeline.py.
+        n = (query.get("relation_params") or {}).get("n")
+        return self.ground_phrase(image, format_grounding_phrase(query["anchor_phrase"], n))
 
     def ground_phrase(self, image: Image.Image, phrase: str) -> dict:
         """Grounds a raw phrase directly - used for the "self" relation and
@@ -58,11 +65,15 @@ class Florence2Grounder(BaseGrounder):
             text_out, task=TASK_PROMPT, image_size=(image.width, image.height)
         )
         bboxes = parsed.get(TASK_PROMPT, {}).get("bboxes", [])
-        if not bboxes:
+        candidates = [[round(v) for v in b] for b in bboxes]
+        if not candidates:
             # No match at all: fall back to the full image so downstream code
             # always has a well-formed (if wrong) prediction to work with.
             bbox = [0, 0, image.width, image.height]
         else:
-            bbox = [round(v) for v in bboxes[0]]
+            bbox = candidates[0]
         point = [round((bbox[0] + bbox[2]) / 2), round((bbox[1] + bbox[3]) / 2)]
-        return {"point": point, "bbox": bbox}
+        # candidates carries every box Florence-2 returned for the phrase
+        # (empty on total miss) so pipeline.py can resolve "the nth X"
+        # deterministically instead of trusting the first match.
+        return {"point": point, "bbox": bbox, "candidates": candidates}

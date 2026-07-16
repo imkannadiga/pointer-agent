@@ -57,6 +57,12 @@ DEFAULT_SYSTEM_PROMPT = (
     "one; fill relation_params with second_anchor_phrase.\n"
     "relation_params is an empty object {} unless the relation above says "
     "otherwise. "
+    "Additionally, if the instruction singles out WHICH occurrence of the "
+    'anchor text is meant (e.g. "the second Submit", "the 3rd occurrence '
+    'of X", "the first \'via\'"), add "n" to relation_params: the 1-based '
+    "occurrence number, counting instances in reading order (top-to-bottom, "
+    "left-to-right). n combines with any relation. Omit n when the "
+    "instruction does not specify an occurrence. "
     'Respond with strict JSON only, no other text: '
     '{"anchor_phrase": "...", "relation": "...", "relation_params": {...}, '
     '"answer_type": "point"|"bbox"}. '
@@ -67,6 +73,22 @@ DEFAULT_SYSTEM_PROMPT = (
 _JSON_BLOCK_RE = re.compile(r"\{.*\}", re.DOTALL)
 _QUOTED_RE = re.compile(r'"([^"]+)"')
 _BBOX_KEYWORDS = ("box", "boundar", "extent", "region", "highlight")
+
+# English-only best-effort ordinal extraction for the fallback parser -
+# real occurrence parsing (all 6 languages) is what slm/train_sft.py's SFT
+# learns from the synthetic occurrence-phrased instructions.
+_ORDINAL_WORDS = {"first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5}
+_ORDINAL_RE = re.compile(
+    r"\b(?:the\s+)?(first|second|third|fourth|fifth|(\d+)(?:st|nd|rd|th))\b",
+    re.IGNORECASE,
+)
+
+
+def _fallback_occurrence(lowered: str) -> int | None:
+    m = _ORDINAL_RE.search(lowered)
+    if not m:
+        return None
+    return int(m.group(2)) if m.group(2) else _ORDINAL_WORDS[m.group(1)]
 
 # Keyword -> relation, checked in order; first match wins. Best-effort only -
 # real relation classification is what slm/train_sft.py's SFT is for.
@@ -100,6 +122,11 @@ def _fallback_parse(instruction: str) -> dict:
     relation_params = {}
     if relation == "between_anchors" and len(quoted) >= 2:
         relation_params = {"second_anchor_phrase": quoted[1]}
+    # Strip quoted spans first so an ordinal word that is itself the anchor
+    # text (e.g. Point to "first") doesn't read as an occurrence index.
+    n = _fallback_occurrence(_QUOTED_RE.sub("", instruction).lower())
+    if n:
+        relation_params["n"] = n
     return {
         "anchor_phrase": anchor_phrase,
         "relation": relation,
