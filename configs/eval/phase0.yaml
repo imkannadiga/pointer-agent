@@ -8,6 +8,12 @@ defaults:
 source: synthetic # synthetic | real
 limit: 30
 seed: 42
+# Rows are grouped into batches of this size and run through
+# Pipeline.run_batch() - each of the planner/grounder/verifier's model
+# calls then covers the whole batch in one generate() call instead of one
+# call per row. batch_size=1 is equivalent to the old fully-sequential
+# behavior (just always going through run_batch's batch-of-one path).
+batch_size: 1
 synthetic_metadata: "output/synthetic_v0/metadata.jsonl"
 synthetic_images_dir: "output/synthetic_v0/images"
 output_dir: "output/eval/phase0_${source}"

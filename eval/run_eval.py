@@ -59,6 +59,10 @@ def _save_viz(image: Image.Image, row: dict, prediction: dict, viz_dir: str):
     img.save(os.path.join(viz_dir, f"{row['id']}.png"))
 
 
+def _chunks(rows: list[dict], size: int) -> list[list[dict]]:
+    return [rows[i : i + size] for i in range(0, len(rows), size)]
+
+
 def _relation_accuracy(records: list[dict]) -> dict:
     """Sprint 4: how often the planner's parsed `relation` matches the
     synthetic ground truth's `relation` - tracked separately from coordinate
@@ -115,19 +119,26 @@ def main(cfg: DictConfig):
 
     predictions = {}
     relation_records = []
-    for i, row in enumerate(gt_rows):
-        image = Image.open(image_paths[row["id"]]).convert("RGB")
-        prediction = pipeline.run(image, row["instruction"])
-        predictions[row["id"]] = {"id": row["id"], **prediction}
-        if "relation" in row and pipeline.last_query:
-            relation_records.append({
-                "predicted": pipeline.last_query.get("relation"),
-                "gt": row["relation"],
-                "category": row["category"],
-            })
-        if cfg.save_viz:
-            _save_viz(image, row, prediction, viz_dir)
-        print(f"[{i + 1}/{len(gt_rows)}] {row['id']} ({row['category']}): {row['instruction']!r}")
+    processed = 0
+    for batch_rows in _chunks(gt_rows, max(1, cfg.batch_size)):
+        images = [Image.open(image_paths[row["id"]]).convert("RGB") for row in batch_rows]
+        instructions = [row["instruction"] for row in batch_rows]
+        batch_predictions = pipeline.run_batch(images, instructions)
+
+        for row, image, prediction, query in zip(
+            batch_rows, images, batch_predictions, pipeline.last_queries
+        ):
+            predictions[row["id"]] = {"id": row["id"], **prediction}
+            if "relation" in row and query:
+                relation_records.append({
+                    "predicted": query.get("relation"),
+                    "gt": row["relation"],
+                    "category": row["category"],
+                })
+            if cfg.save_viz:
+                _save_viz(image, row, prediction, viz_dir)
+            processed += 1
+            print(f"[{processed}/{len(gt_rows)}] {row['id']} ({row['category']}): {row['instruction']!r}")
 
     predictions_path = os.path.join(output_dir, "predictions.jsonl")
     with open(predictions_path, "w") as f:

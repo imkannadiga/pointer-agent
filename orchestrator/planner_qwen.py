@@ -141,6 +141,20 @@ class QwenPlanner(BasePlanner):
 
     def parse(self, instruction: str) -> dict:
         response = self.slm.chat(DEFAULT_SYSTEM_PROMPT, f"Instruction: {instruction}")
+        return self._parse_response(instruction, response)
+
+    def parse_batch(self, instructions: list[str]) -> list[dict]:
+        if not instructions:
+            return []
+        responses = self.slm.chat_batch(
+            DEFAULT_SYSTEM_PROMPT, [f"Instruction: {i}" for i in instructions]
+        )
+        return [
+            self._parse_response(instruction, response)
+            for instruction, response in zip(instructions, responses)
+        ]
+
+    def _parse_response(self, instruction: str, response: str) -> dict:
         match = _JSON_BLOCK_RE.search(response)
         if match:
             try:

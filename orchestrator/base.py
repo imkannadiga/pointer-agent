@@ -32,6 +32,14 @@ class BasePlanner(ABC):
         each expects."""
         raise NotImplementedError
 
+    def parse_batch(self, instructions: list[str]) -> list[dict]:
+        """Batched counterpart of parse() - one query per instruction, same
+        order in, same order out. Default implementation just loops (so
+        every BasePlanner works with Pipeline.run_batch() even before it's
+        optimized); override for a real batched model call, as
+        orchestrator/planner_qwen.py does."""
+        return [self.parse(instruction) for instruction in instructions]
+
 
 class BaseGrounder(ABC):
     """Image + anchor phrase -> point/bbox prediction.
@@ -44,6 +52,12 @@ class BaseGrounder(ABC):
     def ground(self, image: Image.Image, query: dict) -> dict:
         """Returns {"point": [x, y], "bbox": [x0, y0, x1, y1]} (both populated)."""
         raise NotImplementedError
+
+    def ground_batch(self, images: list[Image.Image], queries: list[dict]) -> list[dict]:
+        """Batched counterpart of ground() - same order in, same order out.
+        Default implementation just loops; override for a real batched
+        generate() call, as orchestrator/grounder_florence2.py does."""
+        return [self.ground(image, query) for image, query in zip(images, queries)]
 
 
 class BaseCharLocator(ABC):
@@ -78,3 +92,22 @@ class BaseVerifier(ABC):
     ) -> tuple[bool, dict]:
         """Returns (ok, prediction) - ok is False if the prediction looks wrong."""
         raise NotImplementedError
+
+    def verify_batch(
+        self,
+        instructions: list[str],
+        queries: list[dict],
+        predictions: list[dict],
+        image_sizes: list[tuple[int, int]],
+    ) -> tuple[list[bool], list[dict]]:
+        """Batched counterpart of verify() - returns (oks, predictions), same
+        order in as out. Default implementation just loops; override for a
+        real batched model call, as orchestrator/verifier_qwen.py does."""
+        oks, preds = [], []
+        for instruction, query, prediction, image_size in zip(
+            instructions, queries, predictions, image_sizes
+        ):
+            ok, pred = self.verify(instruction, query, prediction, image_size)
+            oks.append(ok)
+            preds.append(pred)
+        return oks, preds
