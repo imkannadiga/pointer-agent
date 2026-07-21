@@ -71,8 +71,33 @@ DEFAULT_SYSTEM_PROMPT = (
 )
 
 _JSON_BLOCK_RE = re.compile(r"\{.*\}", re.DOTALL)
-_QUOTED_RE = re.compile(r'"([^"]+)"')
+
+# Matches an anchor quoted with any of the four delimiter conventions actually
+# observed in real pointerbench-text instructions: straight double quotes,
+# straight single quotes, backticks, and guillemets. The old version only
+# matched straight double quotes ('"([^"]+)"'), so any instruction using a
+# different delimiter (very common - confirmed via dataset_fidelity_check.py
+# at ~40% single-quote / ~20-23% backtick / ~23% guillemet on the real set)
+# fell through to _fallback_parse's `else` branch and used the ENTIRE
+# instruction as anchor_phrase. That's the exact, confirmed cause of
+# full-instruction-length anchor_phrase values seen in OCR-sanity-check
+# warnings (e.g. a 60-67 char "anchor" that is actually the whole sentence).
+# Each alternative has its own capture group; _find_quoted() below flattens
+# whichever group actually matched into one ordered list.
+_QUOTED_RE = re.compile(r'"([^"]+)"|\'([^\']+)\'|`([^`]+)`|«([^»]+)»')
 _BBOX_KEYWORDS = ("box", "boundar", "extent", "region", "highlight")
+
+
+def _find_quoted(text: str) -> list[str]:
+    """Returns quoted spans in the order they appear, regardless of which
+    of the four delimiter styles was used. Note: doubled/nested delimiters
+    of the same kind (e.g. `««X» Y»`) are a genuinely ambiguous edge case
+    for a single-pass regex and are not specially handled here - this is a
+    best-effort fallback (only invoked when the trained SLM's JSON output
+    itself failed to parse), not the primary parsing path, so it doesn't
+    need to be perfect on unusual nested quoting."""
+    return [next(g for g in m.groups() if g is not None) for m in _QUOTED_RE.finditer(text)]
+
 
 # English-only best-effort ordinal extraction for the fallback parser -
 # real occurrence parsing (all 6 languages) is what slm/train_sft.py's SFT
@@ -110,7 +135,7 @@ _RELATION_KEYWORDS = (
 
 
 def _fallback_parse(instruction: str) -> dict:
-    quoted = _QUOTED_RE.findall(instruction)
+    quoted = _find_quoted(instruction)
     anchor_phrase = quoted[0] if quoted else instruction.strip()
     lowered = instruction.lower()
     answer_type = "bbox" if any(k in lowered for k in _BBOX_KEYWORDS) else "point"
@@ -124,6 +149,9 @@ def _fallback_parse(instruction: str) -> dict:
         relation_params = {"second_anchor_phrase": quoted[1]}
     # Strip quoted spans first so an ordinal word that is itself the anchor
     # text (e.g. Point to "first") doesn't read as an occurrence index.
+    # Stripping now covers all four delimiter styles, not just straight
+    # double quotes, for the same reason _find_quoted replaced the old
+    # single-delimiter _QUOTED_RE.findall() call above.
     n = _fallback_occurrence(_QUOTED_RE.sub("", instruction).lower())
     if n:
         relation_params["n"] = n
