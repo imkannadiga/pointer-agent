@@ -1,0 +1,22 @@
+# Base VLM. A causal chat VLM (rather than e.g. Florence-2's seq2seq loc-token
+# head) so SFT and GRPO can share one free-form coordinate string contract.
+model_id: Qwen/Qwen2.5-VL-3B-Instruct
+dtype: bfloat16
+attn_implementation: sdpa   # switch to flash_attention_2 where installed
+
+# Grounding contract: the instruction shown to the model and the coordinate
+# string it must emit. Absolute pixels in the letterboxed 1024x768 frame,
+# top-left origin. Must stay identical across SFT, GRPO and inference.
+prompt_template: 'Find the bounding box for the text: "{query}". Output format: <box> [x0, y0, x1, y1] </box>'
+box_format: "<box> [{x0}, {y0}, {x1}, {y1}] </box>"
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  # Regex (peft full-matches module names): LM blocks (q/k/v/o + MLP), vision
+  # tower attention + MLP, and the vision->LM merger — GUI grounding needs the
+  # visual features to adapt too. Deliberately excludes patch_embed (Conv3d)
+  # and lm_head.
+  # merger indices are pinned to (0|2): mlp.1 is the GELU in the Sequential.
+  target_modules: '.*\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)$|.*visual\.blocks\.\d+\.attn\.(qkv|proj)$|.*visual\.merger\.mlp\.(0|2)$'

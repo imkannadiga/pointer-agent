@@ -1,0 +1,23 @@
+# Stage 2: GRPO on top of the merged SFT model (trl GRPOTrainer + fresh LoRA).
+sft_model_dir: outputs/sft_model   # stage-1 adapter, merged into the base at load
+output_dir: outputs/grpo_model     # final RL adapter; checkpoints go in a subdir
+
+lr: 5.0e-6
+per_device_batch_size: 1
+grad_accum: 8              # effective batch must be divisible by num_generations
+num_generations: 8         # GRPO group size per prompt
+max_completion_len: 48     # a box string is short; keep rollouts cheap
+temperature: 0.9
+kl_beta: 0.04              # KL penalty against the (merged SFT) reference
+max_steps: 1000
+logging_steps: 5
+save_steps: 100
+
+# Reward channels (logged separately by trl as rewards/<func>/mean).
+reward:
+  format_reward: 0.5          # strict `<box> [...] </box>`-only completions
+  coverage_weight: 0.6
+  precision_weight: 0.4
+  coverage_floor: 0.90        # PointerBench requires coverage >= 0.90
+  floor_penalty: -1.0         # flat return below the floor: never clip text
+  parse_failure_reward: 0.0   # format channel already punishes non-box output

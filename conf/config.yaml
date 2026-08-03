@@ -1,0 +1,19 @@
+# Root Hydra config. Composes one option from each config group; override on
+# the CLI, e.g.:
+#   python -m src.train_sft train_sft.lr=5e-5
+#   python -m src.train_grpo model=qwen2_5_vl_3b wandb.mode=offline
+
+defaults:
+  - data: grounding_mix
+  - model: qwen2_5_vl_3b
+  - train_sft: default
+  - train_grpo: default
+  - _self_
+
+seed: 17
+
+wandb:
+  project: pointer-agent
+  entity: null       # null -> your default W&B entity
+  mode: online       # online | offline | disabled (use disabled for smoke runs)
+  run_name: null     # null -> auto (stage + timestamp)

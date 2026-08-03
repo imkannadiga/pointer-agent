@@ -1,0 +1,62 @@
+# Mixed grounding corpus: OS-Atlas UI screenshots + DocLayNet financial
+# reports (bridging pointerbench-text's dense-document distribution), with
+# PointerBench itself held out for eval.
+
+os_atlas:
+  hf_repo: OS-Copilot/OS-Atlas-data
+  local_dir: data/os_atlas
+  # Metadata cache, built automatically on first run (delete to rebuild).
+  metadata_file: data/os_atlas/metadata.parquet
+  image_dir: data/os_atlas/images
+  # OS-Atlas sources pulled from the Hub on first use: one annotation JSON +
+  # image archive(s) each. Multi-file archives are split-zip parts and get
+  # concatenated before extraction. Mind the sizes before enabling more:
+  # windows ~71 GB, amex ~92 GB, seeclick ~64 GB, fineweb ~467 GB.
+  sources:
+    - name: linux
+      annotations: desktop_domain/linux_splited.json
+      archives: [desktop_domain/linux_images.zip]     # ~3.1 GB
+    - name: macos
+      annotations: desktop_domain/macos_splited.json
+      archives: [desktop_domain/macos_images.zip]     # ~5.5 GB
+    # - name: windows
+    #   annotations: desktop_domain/windows_splited.json
+    #   archives:
+    #     - desktop_domain/windows_image_aa
+    #     - desktop_domain/windows_image_ab
+    #     - desktop_domain/windows_image_ac
+    #     - desktop_domain/windows_image_ad
+  # OS-Atlas stores bboxes as 0-1 ratios of image width/height.
+  bbox_format: normalized
+  # Row filters applied in pandas, in original-screenshot pixel space,
+  # before any PyTorch Dataset is built.
+  min_box_px: 5        # drop elements narrower or shorter than this
+  min_query_chars: 3   # drop near-empty instructions
+
+doclaynet:
+  # Parquet re-release (~7.8 GB full download before category filtering);
+  # the plain docling-project/DocLayNet repo is a legacy script-only
+  # dataset that modern `datasets` cannot load, and it carries no text.
+  hf_repo: docling-project/DocLayNet-v1.1
+  local_dir: data/doclaynet
+  doc_category: financial_reports
+  split: train
+  min_box_px: 5
+  # Cell-text length bounds: line items and table entries, not paragraphs.
+  min_query_chars: 3
+  max_query_chars: 50
+
+# Sampling shares [os_atlas, doclaynet] for both SFT and GRPO. One epoch
+# anchors on OS-Atlas (each row exactly once); DocLayNet is resampled to
+# its share. Set to [1.0, 0.0] to disable DocLayNet entirely (skips its
+# download too).
+mix_ratio: [0.7, 0.3]
+
+eval:
+  hf_repo: WarmwindOS/pointerbench
+  subset: pointerbench-text
+
+# PointerBench evaluates at exactly this frame; all training images are
+# letterboxed (uniform scale + centred zero-padding, never stretched) into it.
+target_size: [1024, 768]   # (width, height)
+letterbox_fill: 0.0

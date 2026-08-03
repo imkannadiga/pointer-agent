@@ -1,0 +1,16 @@
+# Stage 1: supervised fine-tuning (trl SFTTrainer + peft LoRA).
+epochs: 1
+per_device_batch_size: 2
+grad_accum: 16
+lr: 2.0e-5
+lr_scheduler: cosine
+warmup_ratio: 0.03
+weight_decay: 0.0
+max_seq_len: 1024
+bf16: true
+gradient_checkpointing: true
+logging_steps: 10
+save_steps: 500
+holdout_frac: 0.01   # slice of OS-Atlas held out for SFT eval loss
+dataloader_num_workers: 4
+output_dir: outputs/sft_model   # final adapter; checkpoints go in a subdir

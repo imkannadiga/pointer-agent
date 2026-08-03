@@ -1,6 +1,0 @@
-# Sprint 2: verifier shares the planner's loaded QwenSLM instance whenever
-# this name matches the planner's model/planner config, avoiding a second
-# model load. Kept as its own config group so it can point at a different
-# model later without touching orchestration code.
-name: "Qwen/Qwen2.5-0.5B-Instruct"
-device: "cpu"
