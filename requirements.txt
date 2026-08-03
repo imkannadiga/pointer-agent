@@ -1,0 +1,28 @@
+# Pinned to the versions the repo is developed and tested against.
+# Python 3.13. torch ships CUDA 12.4 wheels by default; pick the index
+# matching your driver if needed (https://pytorch.org/get-started/).
+
+torch==2.6.0
+
+# HF stack — trl 1.9 / transformers 5.x pair; the training scripts are
+# written against these APIs (dtype=, mm_token_type_ids, vision GRPO).
+transformers==5.14.1
+trl==1.9.2
+peft==0.19.1
+accelerate==1.14.0
+datasets==5.0.0
+huggingface_hub==1.26.0
+
+# config + tracking
+hydra-core==1.3.4
+omegaconf==2.3.1
+wandb==0.28.1
+
+# data handling
+pandas==3.0.3
+pyarrow==24.0.0
+numpy==2.5.1
+pillow==12.3.0
+
+# optional: flash-attn speeds up training/inference on supported GPUs;
+# install separately and set model.attn_implementation=flash_attention_2.

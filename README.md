@@ -57,8 +57,13 @@ src/train_grpo.py  stage 2 (trl GRPOTrainer, fresh LoRA over merged SFT)
 
 ## Running
 
-Needs a CUDA GPU (bf16). Uses the repo-local `venv/`; log in to W&B first
-(`wandb login`) or run with `wandb.mode=offline`.
+Needs a CUDA GPU (bf16) and Python 3.13. Fresh setup:
+
+```bash
+python -m venv venv && venv/bin/pip install -r requirements.txt
+```
+
+Log in to W&B first (`wandb login`) or run with `wandb.mode=offline`.
 
 **Stage 1 — SFT** (first run downloads the datasets, then trains; adapter
 lands in `outputs/sft_model`):
@@ -91,5 +96,3 @@ to run it, load the base model, merge `outputs/sft_model`, then attach
 - PointerBench eval harness (fetch `pointerbench-text`, run the agent,
   score with the official rules; point tasks answered with the box center)
 - First real SFT + GRPO runs and a phase-by-phase results table
-- Pinned `requirements.txt` (env currently lives in `venv/`:
-  torch 2.6, transformers 5.14, trl 1.9, peft, accelerate, wandb, hydra)
