@@ -21,6 +21,22 @@ plus an agentic inference loop:
    full frame → crop with 15% margin → re-letterbox → refined box → project
    back to absolute frame coordinates.
 
+```mermaid
+flowchart TD
+    A["letterboxed 1024x768 frame + query"] --> B["macro_step<br/>VLM predicts coarse box on the full frame"]
+    B --> C{"parseable box?"}
+    C -- no --> X1(["miss: return None"])
+    C -- yes --> D["clamp box to frame"]
+    D --> E{"box at least 4 px<br/>in both dimensions?"}
+    E -- no --> X2(["return macro box<br/>(too small to zoom)"])
+    E -- yes --> F["crop_and_pad<br/>expand by 15% margin, clamp, crop,<br/>letterbox crop back to 1024x768"]
+    F --> G["micro_step<br/>same VLM predicts refined box on the zoom"]
+    G --> H{"parseable box?"}
+    H -- no --> X3(["fall back:<br/>return macro box"])
+    H -- yes --> I["project_coordinates<br/>invert the zoom letterbox (scale + padding),<br/>then translate by the crop origin"]
+    I --> X4(["refined box in absolute<br/>frame coordinates"])
+```
+
 **Training data** (downloaded automatically from the HF Hub on first run):
 [OS-Atlas](https://huggingface.co/datasets/OS-Copilot/OS-Atlas-data)
 (linux + macos desktop sources, ~8.6 GB) mixed 70/30 with financial-report
